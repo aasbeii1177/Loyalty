@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WafaCard — وفاء كارد</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, collection, addDoc, doc, getDoc, query, where, orderBy, limit, getDocs, serverTimestamp }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  const cfg = {
+    apiKey:"AIzaSyAMlErHOaOAp-11Ww8Ea_wXiRpRYLjKvV4",
+    authDomain:"loyaltycard-73fe9.firebaseapp.com",
+    projectId:"loyaltycard-73fe9",
+    storageBucket:"loyaltycard-73fe9.firebasestorage.app",
+    messagingSenderId:"851290351570",
+    appId:"1:851290351570:web:a7970e26b6170e4806ca0b"
+  };
+  const app = initializeApp(cfg);
+  const db  = getFirestore(app);
+  window.db = db;
+  window.fbFns = { collection, addDoc, doc, getDoc, query, where, orderBy, limit, getDocs, serverTimestamp };
+  window.addEventListener('load', () => { loadHomeStats(); });
+</script>
+<style>
+:root{--gd:#064e3b;--gm:#065f46;--g:#059669;--gl:#d1fae5;--gp:#ecfdf5;--txt:#111827;--txm:#374151;--txs:#6b7280;--bdr:#e5e7eb;--sfc:#f9fafb;--w:#ffffff;--r:14px;--rs:8px;--sh:0 4px 24px rgba(0,0,0,0.08);--shl:0 12px 48px rgba(0,0,0,0.14)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:#f3f4f6;color:var(--txt);min-height:100vh}
+nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-content:space-between;height:64px;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,.2)}
+.logo{display:flex;align-items:center;gap:10px;cursor:pointer;text-decoration:none}
+.logo-mark{width:34px;height:34px;background:var(--g);border-radius:9px;display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:17px;color:#fff;font-weight:600}
+.logo-text{font-family:'Playfair Display',serif;font-size:19px;color:#fff;letter-spacing:-.3px}
+.logo-text span{color:#6ee7b7}
+.ntabs{display:flex;gap:4px}
+.ntab{padding:7px 16px;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;border:none;background:transparent;color:rgba(255,255,255,.6);transition:all .18s;font-family:'DM Sans',sans-serif}
+.ntab:hover{color:#fff;background:rgba(255,255,255,.08)}
+.ntab.active{background:var(--g);color:#fff}
+.page{display:none;padding:2rem;max-width:920px;margin:0 auto}
+.page.active{display:block;animation:fu .3s ease}
+@keyframes fu{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+
+/* HERO */
+.hero{background:var(--gd);border-radius:var(--r);padding:3.5rem 3rem;color:#fff;margin-bottom:1.5rem;position:relative;overflow:hidden}
+.hero::before{content:'و';position:absolute;right:3rem;top:50%;transform:translateY(-50%);font-family:'Playfair Display',serif;font-size:200px;color:rgba(255,255,255,.04);line-height:1;pointer-events:none}
+.hero-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.15);border-radius:20px;padding:4px 14px;font-size:12px;color:#6ee7b7;margin-bottom:1.5rem;letter-spacing:.5px}
+.hero-title{font-family:'Playfair Display',serif;font-size:44px;font-weight:500;line-height:1.12;margin-bottom:1rem;max-width:420px}
+.hero-title span{color:#6ee7b7}
+.hero-sub{font-size:15px;color:rgba(255,255,255,.65);max-width:400px;line-height:1.7;margin-bottom:2.5rem}
+.hero-cta{display:flex;gap:10px;flex-wrap:wrap}
+.btn-g{background:var(--g);color:#fff;border:none;border-radius:var(--rs);padding:12px 24px;font-size:14px;font-weight:500;cursor:pointer;transition:all .18s;font-family:'DM Sans',sans-serif}
+.btn-g:hover{background:#047857;transform:translateY(-1px)}
+.btn-o{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:var(--rs);padding:12px 24px;font-size:14px;font-weight:500;cursor:pointer;transition:all .18s;font-family:'DM Sans',sans-serif}
+.btn-o:hover{background:rgba(255,255,255,.18)}
+
+/* STATS */
+.stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:1.5rem}
+.stat-card{background:var(--w);border:1px solid var(--bdr);border-radius:var(--r);padding:1.5rem;text-align:center}
+.stat-num{font-family:'Playfair Display',serif;font-size:30px;font-weight:500;color:var(--gd);margin-bottom:4px}
+.stat-lbl{font-size:12px;color:var(--txs)}
+
+/* HOW */
+.how-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:1.5rem}
+.how-card{background:var(--w);border:1px solid var(--bdr);border-radius:var(--r);padding:1.5rem}
+.how-num{width:30px;height:30px;background:var(--gp);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500;color:var(--g);margin-bottom:12px}
+.how-card h3{font-size:14px;font-weight:500;margin-bottom:6px}
+.how-card p{font-size:13px;color:var(--txs);line-height:1.6}
+
+/* SIGNUP */
+.signup-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;align-items:start}
+.form-card{background:var(--w);border:1px solid var(--bdr);border-radius:var(--r);padding:2rem;box-shadow:var(--sh)}
+.fg{margin-bottom:1rem}
+.fg label{display:block;font-size:12px;font-weight:500;color:var(--txm);margin-bottom:5px;letter-spacing:.3px}
+.fg input,.fg select{width:100%;padding:11px 14px;border:1px solid var(--bdr);border-radius:var(--rs);font-size:14px;font-family:'DM Sans',sans-serif;color:var(--txt);background:var(--sfc);transition:border .15s;outline:none}
+.fg input:focus,.fg select:focus{border-color:var(--g);background:#fff}
+.fg input::placeholder{color:#9ca3af}
+.btn-submit{width:100%;background:var(--gd);color:#fff;border:none;border-radius:var(--rs);padding:13px;font-size:15px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:.5rem;transition:all .18s}
+.btn-submit:hover{background:var(--gm)}
+.btn-submit:disabled{opacity:.6;cursor:not-allowed}
+
+/* PREVIEW CARD */
+.prev-card{background:var(--gd);border-radius:20px;padding:2rem;color:#fff;position:sticky;top:80px}
+.pch{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.5rem}
+.pcb{font-size:11px;letter-spacing:2px;text-transform:uppercase;opacity:.5}
+.pcl{font-family:'Playfair Display',serif;font-size:15px;color:#6ee7b7}
+.pcn{font-family:'Playfair Display',serif;font-size:22px;font-weight:500;margin-bottom:3px}
+.pcp{font-size:12px;opacity:.5;margin-bottom:1.5rem}
+.pc-stamps{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1.5rem}
+.pcs{width:30px;height:30px;border-radius:50%;border:1.5px solid rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:11px}
+.pcf{display:flex;justify-content:space-between;align-items:flex-end}
+.pcpl{font-size:10px;opacity:.5;text-transform:uppercase;letter-spacing:1px}
+.pcpn{font-family:'Playfair Display',serif;font-size:28px}
+.pct{background:rgba(255,255,255,.1);border-radius:20px;padding:4px 12px;font-size:11px;color:#6ee7b7}
+.pvl{text-align:center;font-size:12px;color:rgba(255,255,255,.35);margin-top:1rem}
+
+/* MY CARD */
+.card-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}
+.digital-card{background:linear-gradient(145deg,var(--gd) 0%,#064e3b 60%,#022c22 100%);border-radius:22px;padding:2rem;color:#fff;box-shadow:var(--shl)}
+.dct{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2rem}
+.dcb{font-family:'Playfair Display',serif;font-size:18px;color:#6ee7b7}
+.dcm{font-size:10px;letter-spacing:2px;text-transform:uppercase;opacity:.45}
+.dcn{font-family:'Playfair Display',serif;font-size:26px;font-weight:500;margin-bottom:3px}
+.dci{font-size:12px;opacity:.5;margin-bottom:1.75rem}
+.dcqr{background:#fff;border-radius:12px;padding:14px;display:inline-block;margin-bottom:1.5rem}
+.dcbt{display:flex;justify-content:space-between;align-items:flex-end}
+.dcpl{font-size:10px;opacity:.45;letter-spacing:1.5px;text-transform:uppercase}
+.dcpn{font-family:'Playfair Display',serif;font-size:32px}
+.dctb{background:rgba(110,231,183,.15);border:1px solid rgba(110,231,183,.3);border-radius:20px;padding:5px 14px;font-size:12px;color:#6ee7b7}
+.card-panels{display:flex;flex-direction:column;gap:12px}
+.panel{background:var(--w);border:1px solid var(--bdr);border-radius:var(--r);padding:1.25rem}
+.panel-title{font-size:11px;font-weight:500;color:var(--txs);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+.stamp-row{display:flex;gap:7px;flex-wrap:wrap}
+.stc{width:36px;height:36px;border-radius:50%;border:2px solid var(--bdr);display:flex;align-items:center;justify-content:center;font-size:14px;color:#d1d5db}
+.stc.earned{background:var(--gp);border-color:var(--g);color:var(--g)}
+.act-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--bdr);font-size:13px}
+.act-row:last-child{border-bottom:none}
+.act-dot{width:8px;height:8px;border-radius:50%;background:var(--g);flex-shrink:0}
+.act-time{margin-left:auto;font-size:11px;color:var(--txs)}
+.loading{text-align:center;padding:1.5rem;color:var(--txs);font-size:13px}
+.spin{display:inline-block;width:16px;height:16px;border:2px solid var(--bdr);border-top-color:var(--g);border-radius:50%;animation:sp .7s linear infinite;margin-right:6px;vertical-align:-2px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%) translateY(80px);background:var(--gd);color:#fff;padding:12px 24px;border-radius:30px;font-size:14px;font-weight:500;box-shadow:var(--shl);transition:transform .35s cubic-bezier(.34,1.56,.64,1);z-index:999;white-space:nowrap}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.toast.err{background:#7f1d1d}
+.ptitle{font-family:'Playfair Display',serif;font-size:26px;font-weight:500;margin-bottom:4px}
+.psub{font-size:14px;color:var(--txs);margin-bottom:1.5rem}
+</style>
+</head>
+<body>
+<nav>
+  <a class="logo" onclick="showPage('home')">
+    <div class="logo-mark">و</div>
+    <div class="logo-text">Wafa<span>Card</span></div>
+  </a>
+  <div class="ntabs">
+    <button class="ntab active" onclick="showPage('home')">Home</button>
+    <button class="ntab" onclick="showPage('signup')">Sign Up</button>
+    <button class="ntab" onclick="showPage('mycard')">My Card</button>
+  </div>
+</nav>
+
+<!-- HOME -->
+<div id="page-home" class="page active">
+  <div class="hero">
+    <div class="hero-badge">🇸🇾 Damascus · دمشق</div>
+    <div class="hero-title">Loyalty that <span>rewards</span> every visit</div>
+    <div class="hero-sub">One card, every restaurant in Damascus. Earn points, collect stamps, unlock rewards — all digital, all instant.</div>
+    <div class="hero-cta">
+      <button class="btn-g" onclick="showPage('signup')">Get your free card →</button>
+      <button class="btn-o" onclick="window.location.href='restaurant.html'">I'm a restaurant owner</button>
+    </div>
+  </div>
+  <div class="stat-row">
+    <div class="stat-card"><div class="stat-num" id="h-cust">—</div><div class="stat-lbl">Active cardholders</div></div>
+    <div class="stat-card"><div class="stat-num">24</div><div class="stat-lbl">Partner restaurants</div></div>
+    <div class="stat-card"><div class="stat-num" id="h-stamps">—</div><div class="stat-lbl">Stamps collected</div></div>
+  </div>
+  <div class="how-grid">
+    <div class="how-card"><div class="how-num">1</div><h3>Sign up free</h3><p>Enter your name and phone. Get your digital card with a unique QR code in seconds.</p></div>
+    <div class="how-card"><div class="how-num">2</div><h3>Visit partners</h3><p>Show your QR at any partner restaurant. They scan it and your stamp is saved automatically.</p></div>
+    <div class="how-card"><div class="how-num">3</div><h3>Earn rewards</h3><p>Fill your stamp card for free meals. Collect points to unlock Silver and Gold tier perks.</p></div>
+  </div>
+</div>
+
+<!-- SIGN UP -->
+<div id="page-signup" class="page">
+  <div class="signup-grid">
+    <div>
+      <div class="ptitle">Get your WafaCard</div>
+      <div class="psub">Free forever. No app needed.</div>
+      <div class="form-card">
+        <div class="fg"><label>Full name — الاسم الكامل</label><input type="text" id="inp-name" placeholder="Ahmad Al-Khatib" oninput="upPrev()"></div>
+        <div class="fg"><label>Phone number — رقم الهاتف</label><input type="tel" id="inp-phone" placeholder="+963 9XX XXX XXXX" oninput="upPrev()"></div>
+        <div class="fg"><label>Age — العمر</label><input type="number" id="inp-age" placeholder="24" min="14" max="80"></div>
+        <div class="fg">
+          <label>Neighborhood — الحي</label>
+          <select id="inp-area">
+            <option value="">Select your area</option>
+            <option>Mazzeh · المزة</option><option>Bab Touma · باب توما</option><option>Malki · المالكي</option>
+            <option>Kafr Sousa · كفر سوسة</option><option>Qassa · القصاع</option><option>Midan · الميدان</option>
+            <option>Old City · المدينة القديمة</option><option>Other</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>Where do you eat most?</label>
+          <select id="inp-pref">
+            <option value="">Select preference</option>
+            <option>Shawarma & fast food</option><option>Cafes & coffee</option>
+            <option>Traditional Syrian</option><option>Pizza & western</option><option>All of the above</option>
+          </select>
+        </div>
+        <button class="btn-submit" id="btn-create" onclick="createCard()">Create my WafaCard →</button>
+      </div>
+    </div>
+    <div>
+      <div class="prev-card">
+        <div class="pch"><div class="pcb">WafaCard</div><div class="pcl">وفاء</div></div>
+        <div class="pcn" id="prev-name">Your Name</div>
+        <div class="pcp" id="prev-phone">+963 9XX XXX XXXX</div>
+        <div class="pc-stamps">
+          <div class="pcs">○</div><div class="pcs">○</div><div class="pcs">○</div>
+          <div class="pcs">○</div><div class="pcs">○</div><div class="pcs">○</div>
+          <div class="pcs">○</div><div class="pcs">○</div><div class="pcs">○</div>
+        </div>
+        <div class="pcf">
+          <div><div class="pcpl">Points</div><div class="pcpn">0</div></div>
+          <div class="pct">Bronze</div>
+        </div>
+        <div class="pvl">Preview — your card will look like this</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MY CARD -->
+<div id="page-mycard" class="page">
+  <div id="mc-loading" class="loading"><span class="spin"></span>Loading your card...</div>
+  <div id="mc-content" style="display:none">
+    <div class="ptitle" id="card-greeting">Your Card</div>
+    <div class="psub">Show your QR code at any partner restaurant to earn stamps</div>
+    <div class="card-grid">
+      <div>
+        <div class="digital-card">
+          <div class="dct">
+            <div class="dcb">WafaCard</div>
+            <div style="text-align:right"><div class="dcm">Member since</div><div style="font-size:12px;opacity:.5" id="dc-joined">—</div></div>
+          </div>
+          <div class="dcn" id="dc-name">—</div>
+          <div class="dci" id="dc-info">—</div>
+          <div class="dcqr"><div id="qrcode"></div></div>
+          <div class="dcbt">
+            <div><div class="dcpl">Total Points</div><div class="dcpn" id="dc-pts">0</div></div>
+            <div class="dctb" id="dc-tier">🥉 Bronze</div>
+          </div>
+        </div>
+      </div>
+      <div class="card-panels">
+        <div class="panel">
+          <div class="panel-title">Stamp progress</div>
+          <div class="stamp-row" id="stamp-display"></div>
+          <div style="font-size:12px;color:var(--txs);margin-top:8px" id="stamp-note"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-title">Recent activity</div>
+          <div id="activity-list"><div class="loading">No activity yet</div></div>
+        </div>
+        <div class="panel">
+          <div class="panel-title">Tier progress</div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--txs);margin-bottom:6px"><span>Bronze</span><span>Silver (500 pts)</span></div>
+          <div style="background:var(--bdr);border-radius:10px;height:8px;overflow:hidden"><div id="tier-bar" style="background:var(--g);height:100%;width:0%;border-radius:10px;transition:width .5s"></div></div>
+          <div style="font-size:12px;color:var(--txs);margin-top:6px" id="tier-note"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="mc-none" style="display:none;text-align:center;padding:3rem">
+    <div style="font-size:48px;margin-bottom:1rem">🪪</div>
+    <div style="font-family:'Playfair Display',serif;font-size:22px;margin-bottom:8px">No card yet</div>
+    <div style="font-size:14px;color:var(--txs);margin-bottom:1.5rem">Sign up to get your free WafaCard</div>
+    <button class="btn-g" onclick="showPage('signup')">Get your card →</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let curDocId = localStorage.getItem('wfc_docid') || null;
+
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.ntab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  const map = ['home','signup','mycard'];
+  const idx = map.indexOf(id);
+  if (idx >= 0) document.querySelectorAll('.ntab')[idx].classList.add('active');
+  if (id === 'mycard') initMyCard();
+  if (id === 'home') loadHomeStats();
+  window.scrollTo(0, 0);
+}
+
+function upPrev() {
+  document.getElementById('prev-name').textContent  = document.getElementById('inp-name').value  || 'Your Name';
+  document.getElementById('prev-phone').textContent = document.getElementById('inp-phone').value || '+963 9XX XXX XXXX';
+}
+
+async function createCard() {
+  const name  = document.getElementById('inp-name').value.trim();
+  const phone = document.getElementById('inp-phone').value.trim();
+  if (!name || !phone) { toast('Please enter your name and phone number', true); return; }
+  const btn = document.getElementById('btn-create');
+  btn.disabled = true; btn.textContent = 'Saving...';
+  try {
+    const { collection, addDoc, serverTimestamp } = window.fbFns;
+    const cardId = 'WFC-' + Math.floor(1000 + Math.random() * 9000);
+    const ref = await addDoc(collection(window.db, 'customers'), {
+      cardId, name, phone,
+      age: document.getElementById('inp-age').value || null,
+      area: document.getElementById('inp-area').value || 'Damascus',
+      preference: document.getElementById('inp-pref').value || null,
+      points: 0, stamps: 0, tier: 'Bronze',
+      createdAt: serverTimestamp()
+    });
+    localStorage.setItem('wfc_docid',  ref.id);
+    localStorage.setItem('wfc_cardid', cardId);
+    curDocId = ref.id;
+    toast('✓ WafaCard created!');
+    setTimeout(() => showPage('mycard'), 1100);
+  } catch (e) {
+    toast('Error: ' + e.message, true);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Create my WafaCard →';
+  }
+}
+
+async function initMyCard() {
+  document.getElementById('mc-loading').style.display = 'block';
+  document.getElementById('mc-content').style.display = 'none';
+  document.getElementById('mc-none').style.display    = 'none';
+  if (!curDocId) {
+    document.getElementById('mc-loading').style.display = 'none';
+    document.getElementById('mc-none').style.display    = 'block';
+    return;
+  }
+  try {
+    const { doc, getDoc } = window.fbFns;
+    const snap = await getDoc(doc(window.db, 'customers', curDocId));
+    if (!snap.exists()) {
+      document.getElementById('mc-loading').style.display = 'none';
+      document.getElementById('mc-none').style.display    = 'block';
+      return;
+    }
+    renderCard(snap.data());
+    loadActivity();
+  } catch (e) {
+    toast('Error loading card', true);
+    document.getElementById('mc-loading').style.display = 'none';
+  }
+}
+
+function renderCard(d) {
+  document.getElementById('mc-loading').style.display = 'none';
+  document.getElementById('mc-content').style.display = 'block';
+  const cardId = localStorage.getItem('wfc_cardid') || 'WFC-0000';
+  document.getElementById('card-greeting').textContent = d.name.split(' ')[0] + "'s Card";
+  document.getElementById('dc-name').textContent = d.name;
+  document.getElementById('dc-info').textContent = d.phone + ' · ' + (d.area || 'Damascus');
+  document.getElementById('dc-pts').textContent  = d.points || 0;
+  document.getElementById('dc-tier').textContent = getTier(d.points).lbl;
+  const joined = d.createdAt ? new Date(d.createdAt.seconds*1000).toLocaleDateString('en-GB',{month:'short',year:'numeric'}) : 'May 2026';
+  document.getElementById('dc-joined').textContent = joined;
+  const qrEl = document.getElementById('qrcode');
+  qrEl.innerHTML = '';
+  new QRCode(qrEl, { text:'wafacard:'+cardId+':'+curDocId, width:100, height:100, colorDark:'#064e3b', colorLight:'#fff', correctLevel:QRCode.CorrectLevel.M });
+  const stamps = d.stamps || 0;
+  const el = document.getElementById('stamp-display');
+  el.innerHTML = '';
+  for (let i = 1; i <= 9; i++) {
+    const s = document.createElement('div');
+    s.className = 'stc' + (i <= stamps ? ' earned' : '');
+    s.textContent = i <= stamps ? '✓' : i;
+    el.appendChild(s);
+  }
+  document.getElementById('stamp-note').textContent = stamps >= 9 ? '🎉 Free meal unlocked! Show this to the restaurant.' : stamps + ' of 9 — ' + (9-stamps) + ' more for a free meal!';
+  const pct = Math.min(100, Math.round(((d.points||0)/500)*100));
+  document.getElementById('tier-bar').style.width  = pct + '%';
+  document.getElementById('tier-note').textContent = (d.points||0) + ' / 500 points to Silver';
+}
+
+async function loadActivity() {
+  try {
+    const { collection, query, where, orderBy, limit, getDocs } = window.fbFns;
+    const q    = query(collection(window.db,'activity'), where('customerId','==',curDocId), orderBy('timestamp','desc'), limit(4));
+    const snap = await getDocs(q);
+    const el   = document.getElementById('activity-list');
+    if (snap.empty) { el.innerHTML = '<div style="font-size:13px;color:var(--txs);padding:4px 0">No activity yet</div>'; return; }
+    el.innerHTML = '';
+    snap.forEach(d => {
+      const data = d.data();
+      const time = data.timestamp ? new Date(data.timestamp.seconds*1000).toLocaleDateString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '—';
+      el.innerHTML += `<div class="act-row"><div class="act-dot"></div><div>${data.restaurant} — stamp added</div><div class="act-time">${time}</div></div>`;
+    });
+  } catch(e) { console.error(e); }
+}
+
+function getTier(pts) {
+  if ((pts||0) >= 1000) return { lbl:'🥇 Gold',   cls:'tg' };
+  if ((pts||0) >= 500)  return { lbl:'🥈 Silver', cls:'tsv' };
+  return                       { lbl:'🥉 Bronze', cls:'tbr' };
+}
+
+async function loadHomeStats() {
+  try {
+    const { collection, getDocs } = window.fbFns;
+    const [c, a] = await Promise.all([getDocs(collection(window.db,'customers')), getDocs(collection(window.db,'activity'))]);
+    document.getElementById('h-cust').textContent   = c.size;
+    document.getElementById('h-stamps').textContent = a.size;
+  } catch(e) {}
+}
+
+function toast(msg, isErr=false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast' + (isErr ? ' err' : '');
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>

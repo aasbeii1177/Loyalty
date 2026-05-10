@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WafaCard — Restaurant Portal</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, collection, addDoc, doc, updateDoc, query, where, orderBy, limit, getDocs, serverTimestamp }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  const cfg = {
+    apiKey:"AIzaSyAMlErHOaOAp-11Ww8Ea_wXiRpRYLjKvV4",
+    authDomain:"loyaltycard-73fe9.firebaseapp.com",
+    projectId:"loyaltycard-73fe9",
+    storageBucket:"loyaltycard-73fe9.firebasestorage.app",
+    messagingSenderId:"851290351570",
+    appId:"1:851290351570:web:a7970e26b6170e4806ca0b"
+  };
+  const app  = initializeApp(cfg);
+  const db   = getFirestore(app);
+  const auth = getAuth(app);
+  window.db  = db; window.auth = auth;
+  window.fbFns = { collection, addDoc, doc, updateDoc, query, where, orderBy, limit, getDocs, serverTimestamp, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut };
+
+  onAuthStateChanged(auth, async (user) => {
+    window.currentUser = user;
+    if (user) {
+      // fetch restaurant name
+      try {
+        const { collection, query, where, getDocs } = window.fbFns;
+        const q    = query(collection(db,'restaurants'), where('uid','==',user.uid));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          window.restaurantName = snap.docs[0].data().name;
+          document.getElementById('r-name').textContent = window.restaurantName;
+          document.getElementById('r-meta').textContent = 'Damascus · WafaCard Partner';
+        }
+      } catch(e) { console.error(e); }
+      showPortal();
+      loadStats();
+      loadRecentScans();
+    } else {
+      showLogin();
+    }
+  });
+</script>
+<style>
+:root{--gd:#064e3b;--gm:#065f46;--g:#059669;--gl:#d1fae5;--gp:#ecfdf5;--txt:#111827;--txm:#374151;--txs:#6b7280;--bdr:#e5e7eb;--sfc:#f9fafb;--w:#ffffff;--r:14px;--rs:8px;--sh:0 4px 24px rgba(0,0,0,0.08);--shl:0 12px 48px rgba(0,0,0,0.14)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:#f3f4f6;color:var(--txt);min-height:100vh}
+nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-content:space-between;height:64px;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,.2)}
+.logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+.logo-mark{width:34px;height:34px;background:var(--g);border-radius:9px;display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:17px;color:#fff;font-weight:600}
+.logo-text{font-family:'Playfair Display',serif;font-size:19px;color:#fff;letter-spacing:-.3px}
+.logo-text span{color:#6ee7b7}
+.nav-tag{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:4px 10px;font-size:11px;color:#6ee7b7;letter-spacing:.5px}
+.nav-right{display:flex;align-items:center;gap:10px}
+.btn-signout{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:var(--rs);padding:7px 14px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .18s}
+.btn-signout:hover{background:rgba(255,255,255,.2)}
+
+/* LOGIN */
+#login-view{display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 64px);padding:2rem}
+.login-box{background:var(--w);border:1px solid var(--bdr);border-radius:var(--r);padding:2.5rem;width:100%;max-width:400px;box-shadow:var(--shl)}
+.login-title{font-family:'Playfair Display',serif;font-size:24px;font-weight:500;margin-bottom:4px}
+.login-sub{font-size:13px;color:var(--txs);margin-bottom:2rem;line-height:1.5}
+.fg{margin-bottom:1rem}
+.fg label{display:block;font-size:12px;font-weight:500;color:var(--txm);margin-bottom:5px;letter-spacing:.3px}
+.fg input{width:100%;padding:11px 14px;border:1px solid var(--bdr);border-radius:var(--rs);font-size:14px;font-family:'DM Sans',sans-serif;color:var(--txt);background:var(--sfc);transition:border .15s;outline:none}
+.fg input:focus{border-color:var(--g);background:#fff}
+.fg input::placeholder{color:#9ca3af}
+.btn-main{width:100%;background:var(--gd);color:#fff;border:none;border-radius:var(--rs);padding:13px;font-size:15px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:.5rem;transition:all .18s}
+.btn-main:hover{background:var(--gm)}
+.btn-main:disabled{opacity:.6;cursor:not-allowed}
+.toggle{text-align:center;font-size:13px;color:var(--txs);margin-top:1.25rem}
+.toggle a{color:var(--g);cursor:pointer;text-decoration:underline}
+.divider{display:flex;align-items:center;gap:10px;margin:1.25rem 0;color:var(--txs);font-size:12px}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--bdr)}
+
+/* PORTAL */
+#portal-view{display:none;padding:2rem;max-width:1000px;margin:0 auto}
+.portal-header{background:var(--w);border:1px solid var(--bdr);border-radius:var(--r);padding:1.25rem 1.75rem;display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;box-shadow:var(--sh)}
+.phn{font-family:'Playfair Display',serif;font-size:22px}
+.phm{font-size:12px;color:var(--txs);margin-top:2px}
+.status{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--g);font-weight:500}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--g);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.portal-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}
+
+/* SCANNER */
+.scan-card{background:var(--w);border:1px solid var(--bdr);border-radius:var(--r);padding:1.75rem;box-shadow:var(--sh)}
+.scan-card h2{font-size:16px;font-weight:500;margin-bottom:1.25rem}
+.scan-area{background:var(--sfc);border:2px dashed var(--bdr);border-radius:var(--r);padding:2.75rem 1rem;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:1.25rem}
+.scan-area:hover{border-color:var(--g);background:var(--gp)}
+.scan-icon{font-size:52px;margin-bottom:10px}
+.scan-txt{font-size:14px;font-weight:500;color:var(--txm);margin-bottom:4px}
+.scan-sub{font-size:12px;color:var(--txs)}
+.divider-txt{text-align:center;font-size:12px;color:var(--txs);margin-bottom:10px}
+.input-row{display:flex;gap:8px}
+.input-row input{flex:1;padding:11px 14px;border:1px solid var(--bdr);border-radius:var(--rs);font-size:14px;font-family:'DM Sans',sans-serif;outline:none}
+.input-row input:focus{border-color:var(--g)}
+.btn-lookup{background:var(--g);color:#fff;border:none;border-radius:var(--rs);padding:11px 20px;font-size:14px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .18s;white-space:nowrap}
+.btn-lookup:hover{background:#047857}
+
+/* CUSTOMER RESULT */
+.cust-result{display:none;background:var(--gp);border:1px solid var(--gl);border-radius:var(--r);padding:1.5rem;margin-top:1.25rem}
+.cust-result.show{display:block;animation:fu .3s ease}
+@keyframes fu{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.cr-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem}
+.cr-name{font-size:17px;font-weight:500;color:var(--gd)}
+.cr-sub{font-size:12px;color:var(--txs);margin-top:2px}
+.cr-pts{font-family:'Playfair Display',serif;font-size:24px;color:var(--gd)}
+.cr-stamps-lbl{font-size:11px;color:var(--txs);margin-bottom:8px;letter-spacing:.3px;text-transform:uppercase}
+.cr-stamps{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1.25rem}
+.cr-stamp{width:32px;height:32px;border-radius:50%;border:1.5px solid var(--gl);background:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;color:#d1d5db}
+.cr-stamp.done{background:var(--g);border-color:var(--g);color:#fff;font-size:12px}
+.btn-stamp{width:100%;background:var(--gd);color:#fff;border:none;border-radius:var(--rs);padding:13px;font-size:15px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .18s}
+.btn-stamp:hover{background:var(--gm)}
+.btn-stamp:disabled{opacity:.5;cursor:not-allowed}
+.stamp-done{display:none;background:var(--gd);color:#fff;border-radius:var(--rs);padding:1rem 1.25rem;margin-top:10px;text-align:center;font-size:14px;font-weight:500}
+.stamp-done.show{display:block;animation:fu .3s ease}
+
+/* SIDE STATS */
+.side-panel{display:flex;flex-direction:column;gap:12px}
+.mini-stat{background:var(--w);border:1px solid var(--bdr);border-radius:var(--r);padding:1.1rem 1.25rem;display:flex;justify-content:space-between;align-items:center}
+.ms-lbl{font-size:13px;color:var(--txs)}
+.ms-val{font-family:'Playfair Display',serif;font-size:26px;color:var(--gd)}
+.recent-card{background:var(--w);border:1px solid var(--bdr);border-radius:var(--r);padding:1.25rem;flex:1}
+.recent-title{font-size:13px;font-weight:500;margin-bottom:12px}
+.scan-row{display:flex;align-items:center;padding:9px 0;border-bottom:1px solid var(--bdr);gap:10px;font-size:13px}
+.scan-row:last-child{border-bottom:none}
+.scan-avatar{width:32px;height:32px;border-radius:50%;background:var(--gp);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;color:var(--gd);flex-shrink:0}
+.scan-name{font-weight:500}
+.scan-time{margin-left:auto;font-size:11px;color:var(--txs)}
+.scan-pts{background:var(--gp);color:var(--gd);border-radius:20px;padding:2px 8px;font-size:11px}
+
+.loading{text-align:center;padding:1.5rem;color:var(--txs);font-size:13px}
+.spin{display:inline-block;width:16px;height:16px;border:2px solid var(--bdr);border-top-color:var(--g);border-radius:50%;animation:sp .7s linear infinite;margin-right:6px;vertical-align:-2px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%) translateY(80px);background:var(--gd);color:#fff;padding:12px 24px;border-radius:30px;font-size:14px;font-weight:500;box-shadow:var(--shl);transition:transform .35s cubic-bezier(.34,1.56,.64,1);z-index:999;white-space:nowrap}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.toast.err{background:#7f1d1d}
+</style>
+</head>
+<body>
+
+<nav>
+  <a class="logo" href="index.html">
+    <div class="logo-mark">و</div>
+    <div class="logo-text">Wafa<span>Card</span></div>
+  </a>
+  <div class="nav-right">
+    <div class="nav-tag">Restaurant Portal</div>
+    <button class="btn-signout" id="btn-signout" onclick="doSignOut()" style="display:none">Sign out</button>
+  </div>
+</nav>
+
+<!-- LOGIN -->
+<div id="login-view">
+  <div class="login-box">
+    <div class="login-title" id="login-title">Restaurant Login</div>
+    <div class="login-sub" id="login-sub">Sign in to access your WafaCard partner portal and start scanning customers.</div>
+    <div class="fg" id="rname-wrap" style="display:none"><label>Restaurant name</label><input type="text" id="inp-rname" placeholder="e.g. Shawarma Palace"></div>
+    <div class="fg"><label>Email address</label><input type="email" id="inp-email" placeholder="you@restaurant.com"></div>
+    <div class="fg"><label>Password</label><input type="password" id="inp-pw" placeholder="••••••••"></div>
+    <button class="btn-main" id="btn-auth" onclick="doAuth()">Sign in</button>
+    <div class="divider">or</div>
+    <div class="toggle" id="toggle-txt"><a onclick="toggleMode()">New partner? Register your restaurant</a></div>
+  </div>
+</div>
+
+<!-- PORTAL -->
+<div id="portal-view">
+  <div class="portal-header">
+    <div>
+      <div class="phn" id="r-name">Restaurant Portal</div>
+      <div class="phm" id="r-meta">Damascus · WafaCard Partner</div>
+    </div>
+    <div class="status"><div class="dot"></div>Portal active</div>
+  </div>
+
+  <div class="portal-grid">
+    <div class="scan-card">
+      <h2>Scan customer card</h2>
+      <div class="scan-area" onclick="simulateScan()">
+        <div class="scan-icon">📷</div>
+        <div class="scan-txt">Tap to open camera scanner</div>
+        <div class="scan-sub">Point camera at customer's WafaCard QR code</div>
+      </div>
+      <div class="divider-txt">— or type customer card ID manually —</div>
+      <div class="input-row">
+        <input type="text" id="manual-id" placeholder="e.g. WFC-4821">
+        <button class="btn-lookup" onclick="lookupCustomer()">Look up</button>
+      </div>
+
+      <div class="cust-result" id="cust-result">
+        <div class="cr-top">
+          <div>
+            <div class="cr-name" id="cr-name">—</div>
+            <div class="cr-sub" id="cr-sub">—</div>
+          </div>
+          <div class="cr-pts" id="cr-pts">0 pts</div>
+        </div>
+        <div class="cr-stamps-lbl">Stamp progress at your restaurant</div>
+        <div class="cr-stamps" id="cr-stamps"></div>
+        <button class="btn-stamp" id="btn-stamp" onclick="addStamp()">✓ Add stamp for this visit</button>
+        <div class="stamp-done" id="stamp-done">✓ Stamp saved to Firebase!</div>
+      </div>
+    </div>
+
+    <div class="side-panel">
+      <div class="mini-stat"><div class="ms-lbl">Scans today</div><div class="ms-val" id="stat-today">—</div></div>
+      <div class="mini-stat"><div class="ms-lbl">Total scans</div><div class="ms-val" id="stat-total">—</div></div>
+      <div class="recent-card">
+        <div class="recent-title">Recent scans</div>
+        <div id="recent-list"><div class="loading"><span class="spin"></span>Loading...</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let isRegMode  = false;
+let lookupData = null;
+
+function showLogin()  {
+  document.getElementById('login-view').style.display  = 'flex';
+  document.getElementById('portal-view').style.display = 'none';
+  document.getElementById('btn-signout').style.display = 'none';
+}
+function showPortal() {
+  document.getElementById('login-view').style.display  = 'none';
+  document.getElementById('portal-view').style.display = 'block';
+  document.getElementById('btn-signout').style.display = 'block';
+}
+
+function toggleMode() {
+  isRegMode = !isRegMode;
+  document.getElementById('login-title').textContent = isRegMode ? 'Register your restaurant' : 'Restaurant Login';
+  document.getElementById('login-sub').textContent   = isRegMode ? 'Create your WafaCard partner account.' : 'Sign in to access your WafaCard partner portal and start scanning customers.';
+  document.getElementById('btn-auth').textContent    = isRegMode ? 'Register' : 'Sign in';
+  document.getElementById('rname-wrap').style.display = isRegMode ? 'block' : 'none';
+  document.getElementById('toggle-txt').innerHTML    = isRegMode ? '<a onclick="toggleMode()">Already registered? Sign in</a>' : '<a onclick="toggleMode()">New partner? Register your restaurant</a>';
+}
+
+async function doAuth() {
+  const email = document.getElementById('inp-email').value.trim();
+  const pw    = document.getElementById('inp-pw').value;
+  if (!email || !pw) { toast('Enter your email and password', true); return; }
+  const btn = document.getElementById('btn-auth');
+  btn.disabled = true; btn.textContent = isRegMode ? 'Registering...' : 'Signing in...';
+  try {
+    const { createUserWithEmailAndPassword, signInWithEmailAndPassword, collection, addDoc, serverTimestamp } = window.fbFns;
+    if (isRegMode) {
+      const rname = document.getElementById('inp-rname').value.trim();
+      if (!rname) { toast('Enter your restaurant name', true); btn.disabled=false; btn.textContent='Register'; return; }
+      const cred = await createUserWithEmailAndPassword(window.auth, email, pw);
+      await addDoc(collection(window.db,'restaurants'), { uid:cred.user.uid, name:rname, email, createdAt:serverTimestamp() });
+      window.restaurantName = rname;
+      document.getElementById('r-name').textContent = rname;
+      toast('✓ Restaurant registered!');
+    } else {
+      await signInWithEmailAndPassword(window.auth, email, pw);
+      toast('✓ Welcome back!');
+    }
+  } catch (e) {
+    toast(e.message.replace('Firebase: ','').replace(/\(.*\)/,'').trim(), true);
+  } finally {
+    btn.disabled = false; btn.textContent = isRegMode ? 'Register' : 'Sign in';
+  }
+}
+
+async function doSignOut() {
+  await window.fbFns.signOut(window.auth);
+  toast('Signed out');
+}
+
+function simulateScan() {
+  const stored = localStorage.getItem('wfc_cardid');
+  if (stored) { document.getElementById('manual-id').value = stored; lookupCustomer(); }
+  else toast('Enter a card ID manually to test', true);
+}
+
+async function lookupCustomer() {
+  const cardId = document.getElementById('manual-id').value.trim();
+  if (!cardId) { toast('Enter a customer card ID', true); return; }
+  try {
+    const { collection, query, where, getDocs } = window.fbFns;
+    const q    = query(collection(window.db,'customers'), where('cardId','==',cardId));
+    const snap = await getDocs(q);
+    if (snap.empty) { toast('Card not found', true); return; }
+    const d = snap.docs[0];
+    lookupData = { id:d.id, ...d.data() };
+    renderResult(lookupData);
+  } catch(e) { toast('Error: ' + e.message, true); }
+}
+
+function renderResult(d) {
+  document.getElementById('cr-name').textContent = d.name;
+  document.getElementById('cr-sub').textContent  = d.phone + ' · ' + getTier(d.points).lbl;
+  document.getElementById('cr-pts').textContent  = (d.points||0) + ' pts';
+  const stamps = d.stamps || 0;
+  const el = document.getElementById('cr-stamps');
+  el.innerHTML = '';
+  for (let i = 1; i <= 9; i++) {
+    const s = document.createElement('div');
+    s.className = 'cr-stamp' + (i <= stamps ? ' done' : '');
+    s.textContent = i <= stamps ? '✓' : '';
+    el.appendChild(s);
+  }
+  document.getElementById('stamp-done').classList.remove('show');
+  document.getElementById('btn-stamp').disabled = false;
+  document.getElementById('btn-stamp').textContent = '✓ Add stamp for this visit';
+  document.getElementById('cust-result').classList.add('show');
+}
+
+async function addStamp() {
+  if (!lookupData) return;
+  const btn = document.getElementById('btn-stamp');
+  btn.disabled = true; btn.textContent = 'Saving...';
+  try {
+    const { doc, updateDoc, collection, addDoc, serverTimestamp } = window.fbFns;
+    let newStamps = (lookupData.stamps || 0) + 1;
+    let newPoints = (lookupData.points || 0) + 10;
+    const freeMeal = newStamps >= 9;
+    if (freeMeal) newStamps = 0;
+    const newTier = getTier(newPoints).lbl.replace(/[🥉🥈🥇] /,'');
+    await updateDoc(doc(window.db,'customers',lookupData.id), { stamps:newStamps, points:newPoints, tier:newTier });
+    await addDoc(collection(window.db,'activity'), {
+      customerId: lookupData.id, customerName: lookupData.name,
+      cardId: lookupData.cardId, restaurant: window.restaurantName || 'Restaurant',
+      pointsAdded: 10, timestamp: serverTimestamp()
+    });
+    lookupData.stamps = newStamps; lookupData.points = newPoints;
+    const msg = freeMeal ? '✓ Free meal earned! 🎉 Card reset.' : '✓ Stamp saved! Now ' + newStamps + '/9.';
+    document.getElementById('stamp-done').textContent = msg;
+    document.getElementById('stamp-done').classList.add('show');
+    renderResult(lookupData);
+    toast('✓ Recorded in Firebase');
+    loadStats(); loadRecentScans();
+  } catch(e) {
+    toast('Error: ' + e.message, true);
+    btn.disabled = false; btn.textContent = '✓ Add stamp for this visit';
+  }
+}
+
+async function loadStats() {
+  try {
+    const { collection, query, where, getDocs } = window.fbFns;
+    const rn  = window.restaurantName || '';
+    const all = await getDocs(query(collection(window.db,'activity'), where('restaurant','==',rn)));
+    document.getElementById('stat-total').textContent = all.size;
+    const today = new Date(); today.setHours(0,0,0,0);
+    let cnt = 0;
+    all.forEach(d => { const ts=d.data().timestamp; if(ts && ts.seconds*1000>=today.getTime()) cnt++; });
+    document.getElementById('stat-today').textContent = cnt;
+  } catch(e) { console.error(e); }
+}
+
+async function loadRecentScans() {
+  try {
+    const { collection, query, where, orderBy, limit, getDocs } = window.fbFns;
+    const rn   = window.restaurantName || '';
+    const q    = query(collection(window.db,'activity'), where('restaurant','==',rn), orderBy('timestamp','desc'), limit(6));
+    const snap = await getDocs(q);
+    const el   = document.getElementById('recent-list');
+    if (snap.empty) { el.innerHTML = '<div style="font-size:13px;color:var(--txs);padding:8px 0">No scans yet — scan your first customer!</div>'; return; }
+    el.innerHTML = '';
+    snap.forEach(d => {
+      const data     = d.data();
+      const initials = data.customerName.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+      const time     = data.timestamp ? new Date(data.timestamp.seconds*1000).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : '—';
+      el.innerHTML += `<div class="scan-row"><div class="scan-avatar">${initials}</div><div><div class="scan-name">${data.customerName}</div><div style="font-size:11px;color:var(--txs)">+${data.pointsAdded} pts</div></div><div class="scan-pts">+${data.pointsAdded}</div><div class="scan-time">${time}</div></div>`;
+    });
+  } catch(e) { console.error(e); }
+}
+
+function getTier(pts) {
+  if ((pts||0) >= 1000) return { lbl:'🥇 Gold' };
+  if ((pts||0) >= 500)  return { lbl:'🥈 Silver' };
+  return                       { lbl:'🥉 Bronze' };
+}
+
+function toast(msg, isErr=false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast' + (isErr ? ' err' : '');
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>
