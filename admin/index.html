@@ -5,11 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>WafaCard — Admin</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<!-- SheetJS for Excel parsing -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, addDoc, doc, updateDoc, deleteDoc, getDocs, query, orderBy, limit, serverTimestamp }
+  import { getFirestore, collection, addDoc, doc, updateDoc, deleteDoc, getDocs,
+           query, where, orderBy, limit, serverTimestamp }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-  import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword }
+  import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged,
+           createUserWithEmailAndPassword }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
   const cfg = {
@@ -27,7 +33,8 @@
   window.db   = db;
   window.auth = auth;
   window.fbFns = {
-    collection, addDoc, doc, updateDoc, deleteDoc, getDocs, query, orderBy, limit, serverTimestamp,
+    collection, addDoc, doc, updateDoc, deleteDoc, getDocs,
+    query, where, orderBy, limit, serverTimestamp,
     signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword
   };
 
@@ -45,18 +52,29 @@
     }
   });
 </script>
+
 <style>
-:root{--gd:#064e3b;--gm:#065f46;--g:#059669;--gl:#d1fae5;--gp:#ecfdf5;--gold:#b45309;--goldl:#fef3c7;--red:#dc2626;--redl:#fef2f2;--txt:#111827;--txm:#374151;--txs:#6b7280;--bdr:#e5e7eb;--sfc:#f9fafb;--w:#ffffff;--r:14px;--rs:8px;--sh:0 4px 24px rgba(0,0,0,.08);--shl:0 12px 48px rgba(0,0,0,.14)}
+:root {
+  --gd:#064e3b;--gm:#065f46;--g:#059669;--gl:#d1fae5;--gp:#ecfdf5;
+  --bd:#1e3a5f;--b:#2563eb;--bl:#bfdbfe;--bp:#eff6ff;
+  --gold:#b45309;--goldl:#fef3c7;
+  --red:#dc2626;--redl:#fef2f2;
+  --txt:#111827;--txm:#374151;--txs:#6b7280;
+  --bdr:#e5e7eb;--sfc:#f9fafb;--w:#ffffff;
+  --r:14px;--rs:8px;
+  --sh:0 4px 24px rgba(0,0,0,.08);--shl:0 12px 48px rgba(0,0,0,.14)
+}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'DM Sans',sans-serif;background:#f3f4f6;color:var(--txt);min-height:100vh}
+
+/* NAV */
 nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-content:space-between;height:64px;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,.2)}
 .logo{display:flex;align-items:center;gap:10px;cursor:pointer}
 .logo-mark{width:34px;height:34px;background:var(--g);border-radius:9px;display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:17px;color:#fff;font-weight:600}
 .logo-text{font-family:'Playfair Display',serif;font-size:19px;color:#fff;letter-spacing:-.3px}
 .logo-text span{color:#6ee7b7}
 .nav-tag{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:6px;padding:4px 10px;font-size:11px;color:#fbbf24;letter-spacing:.5px}
-.nav-right{display:flex;align-items:center;gap:10px}
-.btn-out{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:var(--rs);padding:7px 14px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .18s}
+.btn-out{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:var(--rs);padding:7px 14px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif}
 .btn-out:hover{background:rgba(255,255,255,.2)}
 
 /* LOGIN */
@@ -67,99 +85,112 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
 .login-sub{font-size:13px;color:var(--txs);margin-bottom:2rem}
 .fg{margin-bottom:1rem}
 .fg label{display:block;font-size:12px;font-weight:500;color:var(--txm);margin-bottom:5px}
-.fg input{width:100%;padding:11px 14px;border:1px solid var(--bdr);border-radius:var(--rs);font-size:14px;font-family:'DM Sans',sans-serif;color:var(--txt);background:var(--sfc);transition:border .15s;outline:none}
-.fg input:focus{border-color:var(--g);background:#fff}
+.fg input,.fg select{width:100%;padding:11px 14px;border:1px solid var(--bdr);border-radius:var(--rs);font-size:14px;font-family:'DM Sans',sans-serif;color:var(--txt);background:var(--sfc);transition:border .15s;outline:none}
+.fg input:focus,.fg select:focus{border-color:var(--g);background:#fff}
 .fg input::placeholder{color:#9ca3af}
-.btn-login{width:100%;background:var(--gd);color:#fff;border:none;border-radius:var(--rs);padding:13px;font-size:15px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:.5rem;transition:all .18s}
-.btn-login:hover{background:var(--gm)}
-.btn-login:disabled{opacity:.6;cursor:not-allowed}
-.err-msg{font-size:12px;color:var(--red);margin-top:8px;display:none}
+.fg .hint{font-size:11px;color:var(--txs);margin-top:4px}
+.btn-main{width:100%;background:var(--gd);color:#fff;border:none;border-radius:var(--rs);padding:13px;font-size:15px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:.5rem;transition:all .18s}
+.btn-main:hover{background:var(--gm)}
+.btn-main:disabled{opacity:.6;cursor:not-allowed}
+.err-msg{font-size:12px;color:var(--red);margin-top:8px;display:none;line-height:1.5}
 .err-msg.show{display:block}
+.suc-msg{font-size:12px;color:var(--g);margin-top:8px;display:none;line-height:1.5;font-weight:500}
+.suc-msg.show{display:block}
 
 /* DASH */
-#dash-view{display:none;padding:2rem;max-width:1100px;margin:0 auto}
-.dash-header{margin-bottom:1.75rem}
+#dash-view{display:none;padding:2rem;max-width:1150px;margin:0 auto}
 .dash-title{font-family:'Playfair Display',serif;font-size:28px;font-weight:500;margin-bottom:4px}
-.dash-sub{font-size:14px;color:var(--txs)}
+.dash-sub{font-size:14px;color:var(--txs);margin-bottom:1.75rem}
 
-/* STAT CARDS */
-.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:1.5rem}
-.stat-card{background:var(--w);border:1px solid var(--bdr);border-radius:var(--r);padding:1.25rem}
-.stat-label{font-size:12px;color:var(--txs);margin-bottom:6px}
-.stat-val{font-family:'Playfair Display',serif;font-size:30px;color:var(--gd)}
-.stat-note{font-size:11px;color:var(--g);margin-top:4px}
+/* STAT GRID */
+.stat-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:1.5rem}
+.stat-card{background:var(--w);border:1px solid var(--bdr);border-radius:var(--r);padding:1.1rem}
+.stat-label{font-size:11px;color:var(--txs);margin-bottom:5px}
+.stat-val{font-family:'Playfair Display',serif;font-size:26px;color:var(--gd)}
+.stat-note{font-size:11px;color:var(--g);margin-top:3px}
 
 /* TABS */
-.dash-tabs{display:flex;gap:6px;background:var(--w);border:1px solid var(--bdr);border-radius:var(--r);padding:6px;margin-bottom:1.5rem;box-shadow:var(--sh)}
-.dtab{flex:1;padding:9px;border-radius:var(--rs);font-size:13px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--txs);transition:all .18s;font-family:'DM Sans',sans-serif}
+.dash-tabs{display:flex;gap:4px;background:var(--w);border:1px solid var(--bdr);border-radius:var(--r);padding:5px;margin-bottom:1.5rem;box-shadow:var(--sh);flex-wrap:wrap}
+.dtab{flex:1;padding:9px 6px;border-radius:var(--rs);font-size:12px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--txs);transition:all .18s;font-family:'DM Sans',sans-serif;white-space:nowrap;min-width:80px}
 .dtab:hover{color:var(--txt);background:var(--sfc)}
 .dtab.active{background:var(--gd);color:#fff}
 .tab-section{display:none}
 .tab-section.active{display:block;animation:fu .25s ease}
 @keyframes fu{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 
+/* PANELS */
+.panel{background:var(--w);border:1px solid var(--bdr);border-radius:var(--r);padding:1.75rem;margin-bottom:1.5rem;box-shadow:var(--sh)}
+.panel-title{font-size:15px;font-weight:500;margin-bottom:4px}
+.panel-sub{font-size:13px;color:var(--txs);margin-bottom:1.25rem;line-height:1.5}
+.form-row{display:grid;gap:10px;align-items:end}
+.form-row.cols2{grid-template-columns:1fr 1fr}
+.form-row.cols3{grid-template-columns:1fr 1fr 1fr}
+.form-row.cols4{grid-template-columns:1fr 1fr 1fr auto}
+.form-row.cols5{grid-template-columns:1fr 1fr 1fr 1fr auto}
+.fg-inline{margin-bottom:0}
+.btn-action{background:var(--gd);color:#fff;border:none;border-radius:var(--rs);padding:11px 20px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .18s;white-space:nowrap;height:44px}
+.btn-action:hover{background:var(--gm)}
+.btn-action:disabled{opacity:.6;cursor:not-allowed}
+.btn-blue{background:var(--bd)}
+.btn-blue:hover{background:var(--b)}
+
 /* TABLE */
-.table-card{background:var(--w);border:1px solid var(--bdr);border-radius:var(--r);overflow:hidden;box-shadow:var(--sh)}
+.table-card{background:var(--w);border:1px solid var(--bdr);border-radius:var(--r);overflow:hidden;box-shadow:var(--sh);margin-bottom:1.5rem}
 .table-top{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--bdr);flex-wrap:wrap;gap:10px}
 .table-title{font-size:14px;font-weight:500}
 .search-input{padding:7px 12px;border:1px solid var(--bdr);border-radius:var(--rs);font-size:13px;font-family:'DM Sans',sans-serif;outline:none;width:220px}
 .search-input:focus{border-color:var(--g)}
 .thead{display:grid;padding:10px 16px;background:var(--sfc);border-bottom:1px solid var(--bdr);font-size:11px;font-weight:500;color:var(--txs);text-transform:uppercase;letter-spacing:.5px}
-.trow{display:grid;padding:13px 16px;border-bottom:1px solid var(--bdr);font-size:13px;align-items:center;transition:background .12s}
+.trow{display:grid;padding:12px 16px;border-bottom:1px solid var(--bdr);font-size:13px;align-items:center;transition:background .12s}
 .trow:last-child{border-bottom:none}
 .trow:hover{background:var(--sfc)}
 .tname{font-weight:500}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;gap:4px;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:500}
+.badge-active{background:var(--gp);color:var(--gd)}
+.badge-disabled{background:var(--redl);color:var(--red)}
+.badge-pending{background:#fef3c7;color:#92400e}
+.badge-student{background:var(--bp);color:var(--bd)}
 .tier-badge{display:inline-block;border-radius:20px;padding:2px 10px;font-size:11px;font-weight:500}
 .tg{background:var(--goldl);color:var(--gold)}
 .tsv{background:#f3f4f6;color:#6b7280}
 .tbr{background:#fef3f2;color:#b45309}
 
-/* STATUS BADGES */
-.badge{display:inline-flex;align-items:center;gap:5px;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:500}
-.badge-active{background:var(--gp);color:var(--gd)}
-.badge-disabled{background:var(--redl);color:var(--red)}
-
 /* ACTION BUTTONS */
-.action-btns{display:flex;gap:6px;align-items:center}
-.btn-sm{padding:5px 12px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;border:none;font-family:'DM Sans',sans-serif;transition:all .18s;white-space:nowrap}
+.action-btns{display:flex;gap:5px;flex-wrap:wrap}
+.btn-sm{padding:5px 10px;border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;border:none;font-family:'DM Sans',sans-serif;transition:all .18s;white-space:nowrap}
 .btn-disable{background:#fef3c7;color:#92400e;border:1px solid #fde68a}
 .btn-disable:hover{background:#fde68a}
 .btn-enable{background:var(--gp);color:var(--gd);border:1px solid var(--gl)}
 .btn-enable:hover{background:var(--gl)}
 .btn-delete{background:var(--redl);color:var(--red);border:1px solid #fecaca}
 .btn-delete:hover{background:#fecaca}
+.btn-activate{background:var(--bp);color:var(--bd);border:1px solid var(--bl)}
+.btn-activate:hover{background:var(--bl)}
+.btn-copy{background:var(--sfc);color:var(--txm);border:1px solid var(--bdr)}
+.btn-copy:hover{background:var(--bdr)}
 
-/* CREATE RESTAURANT PANEL */
-.create-panel{background:var(--w);border:1px solid var(--bdr);border-radius:var(--r);padding:1.75rem;margin-bottom:1.5rem;box-shadow:var(--sh)}
-.create-title{font-size:15px;font-weight:500;margin-bottom:4px}
-.create-sub{font-size:13px;color:var(--txs);margin-bottom:1.25rem}
-.create-grid{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:10px;align-items:end}
-.create-grid .fg{margin-bottom:0}
-.btn-create{background:var(--gd);color:#fff;border:none;border-radius:var(--rs);padding:11px 20px;font-size:14px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .18s;white-space:nowrap;height:44px}
-.btn-create:hover{background:var(--gm)}
-.btn-create:disabled{opacity:.6;cursor:not-allowed}
-.create-err{font-size:12px;color:var(--red);margin-top:8px;display:none}
-.create-err.show{display:block}
-.create-success{font-size:12px;color:var(--g);margin-top:8px;display:none;font-weight:500}
-.create-success.show{display:block}
+/* QR DISPLAY */
+.qr-result{display:none;background:var(--sfc);border:1px solid var(--bdr);border-radius:var(--r);padding:1.5rem;text-align:center;margin-top:1rem}
+.qr-result.show{display:block;animation:fu .3s ease}
+.qr-label{font-size:13px;font-weight:500;margin-bottom:12px;color:var(--txt)}
+.qr-sub{font-size:12px;color:var(--txs);margin-top:10px}
+.btn-print{background:var(--bd);color:#fff;border:none;border-radius:var(--rs);padding:9px 18px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:10px;transition:all .18s}
+.btn-print:hover{background:var(--b)}
 
-/* CONFIRM MODAL */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:none;align-items:center;justify-content:center}
-.modal-overlay.show{display:flex}
-.modal{background:var(--w);border-radius:var(--r);padding:2rem;max-width:400px;width:90%;box-shadow:var(--shl)}
-.modal-icon{font-size:32px;margin-bottom:1rem}
-.modal-title{font-family:'Playfair Display',serif;font-size:20px;margin-bottom:8px}
-.modal-msg{font-size:14px;color:var(--txs);margin-bottom:1.5rem;line-height:1.55}
-.modal-actions{display:flex;gap:8px;justify-content:flex-end}
-.btn-cancel{background:var(--sfc);color:var(--txm);border:1px solid var(--bdr);border-radius:var(--rs);padding:9px 18px;font-size:14px;cursor:pointer;font-family:'DM Sans',sans-serif}
-.btn-confirm-del{background:var(--red);color:#fff;border:none;border-radius:var(--rs);padding:9px 18px;font-size:14px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif}
-.btn-confirm-del:hover{background:#b91c1c}
-
-/* ACTIVITY */
-.athhead{display:grid;grid-template-columns:2fr 2fr 1fr 1fr;padding:10px 16px;background:var(--sfc);border-bottom:1px solid var(--bdr);font-size:11px;font-weight:500;color:var(--txs);text-transform:uppercase;letter-spacing:.5px}
-.athrow{display:grid;grid-template-columns:2fr 2fr 1fr 1fr;padding:12px 16px;border-bottom:1px solid var(--bdr);font-size:13px;align-items:center}
-.athrow:last-child{border-bottom:none}
-.athrow:hover{background:var(--sfc)}
+/* EXCEL UPLOAD */
+.upload-area{background:var(--sfc);border:2px dashed var(--bdr);border-radius:var(--r);padding:2rem;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:1rem}
+.upload-area:hover{border-color:var(--g);background:var(--gp)}
+.upload-icon{font-size:36px;margin-bottom:8px}
+.upload-txt{font-size:14px;font-weight:500;color:var(--txm);margin-bottom:4px}
+.upload-sub{font-size:12px;color:var(--txs)}
+.upload-preview{display:none;margin-top:1rem}
+.upload-preview.show{display:block}
+.preview-table{width:100%;border-collapse:collapse;font-size:13px}
+.preview-table th{background:var(--sfc);padding:8px 12px;text-align:left;font-size:11px;font-weight:500;color:var(--txs);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--bdr)}
+.preview-table td{padding:8px 12px;border-bottom:1px solid var(--bdr)}
+.preview-table tr:last-child td{border-bottom:none}
 
 /* REVENUE */
 .rev-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}
@@ -172,6 +203,19 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
 .rev-total{display:flex;justify-content:space-between;align-items:center;padding:12px 0 0;font-size:15px;font-weight:500;border-top:2px solid var(--gd);margin-top:4px}
 .rev-total span:last-child{color:var(--gd)}
 
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:none;align-items:center;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal{background:var(--w);border-radius:var(--r);padding:2rem;max-width:420px;width:90%;box-shadow:var(--shl)}
+.modal-icon{font-size:32px;margin-bottom:1rem}
+.modal-title{font-family:'Playfair Display',serif;font-size:20px;margin-bottom:8px}
+.modal-msg{font-size:14px;color:var(--txs);margin-bottom:1.5rem;line-height:1.55}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end}
+.btn-cancel{background:var(--sfc);color:var(--txm);border:1px solid var(--bdr);border-radius:var(--rs);padding:9px 18px;font-size:14px;cursor:pointer;font-family:'DM Sans',sans-serif}
+.btn-confirm-del{background:var(--red);color:#fff;border:none;border-radius:var(--rs);padding:9px 18px;font-size:14px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif}
+.btn-confirm-del:hover{background:#b91c1c}
+
+/* UTILS */
 .loading{text-align:center;padding:2rem;color:var(--txs);font-size:13px}
 .spin{display:inline-block;width:16px;height:16px;border:2px solid var(--bdr);border-top-color:var(--g);border-radius:50%;animation:sp .7s linear infinite;margin-right:6px;vertical-align:-2px}
 @keyframes sp{to{transform:rotate(360deg)}}
@@ -179,16 +223,17 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
 .toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%) translateY(80px);background:var(--gd);color:#fff;padding:12px 24px;border-radius:30px;font-size:14px;font-weight:500;box-shadow:var(--shl);transition:transform .35s cubic-bezier(.34,1.56,.64,1);z-index:999;white-space:nowrap}
 .toast.show{transform:translateX(-50%) translateY(0)}
 .toast.err{background:#7f1d1d}
+.divider{height:1px;background:var(--bdr);margin:1.25rem 0}
 </style>
 </head>
 <body>
 
 <nav>
-  <div class="logo" onclick="window.location.href='index.html'">
+  <div class="logo" onclick="window.location.href='../index.html'">
     <div class="logo-mark">و</div>
     <div class="logo-text">Wafa<span>Card</span></div>
   </div>
-  <div class="nav-right">
+  <div style="display:flex;align-items:center;gap:10px">
     <div class="nav-tag">⚙ Admin</div>
     <button class="btn-out" id="btn-out" onclick="doSignOut()" style="display:none">Sign out</button>
   </div>
@@ -203,57 +248,47 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
     <div class="fg"><label>Admin email</label><input type="email" id="a-email" placeholder="admin@wafacard.sy"></div>
     <div class="fg"><label>Password</label><input type="password" id="a-pw" placeholder="••••••••"></div>
     <div class="err-msg" id="login-err">—</div>
-    <button class="btn-login" id="btn-login" onclick="doLogin()">Sign in</button>
+    <button class="btn-main" id="btn-login" onclick="doLogin()">Sign in</button>
   </div>
 </div>
 
 <!-- DASHBOARD -->
 <div id="dash-view">
-  <div class="dash-header">
-    <div class="dash-title">Admin Dashboard</div>
-    <div class="dash-sub">WafaCard Damascus — live data</div>
-  </div>
+  <div class="dash-title">Admin Dashboard</div>
+  <div class="dash-sub">WafaCard Damascus — live control panel</div>
 
   <div class="stat-grid">
-    <div class="stat-card"><div class="stat-label">Total customers</div><div class="stat-val" id="s-cust">—</div><div class="stat-note">registered cardholders</div></div>
-    <div class="stat-card"><div class="stat-label">Total stamps</div><div class="stat-val" id="s-stamps">—</div><div class="stat-note">all restaurants</div></div>
+    <div class="stat-card"><div class="stat-label">Total customers</div><div class="stat-val" id="s-cust">—</div><div class="stat-note">loyalty card</div></div>
+    <div class="stat-card"><div class="stat-label">Active students</div><div class="stat-val" id="s-students">—</div><div class="stat-note">student pass</div></div>
+    <div class="stat-card"><div class="stat-label">Pending activation</div><div class="stat-val" id="s-pending">—</div><div class="stat-note">need action</div></div>
     <div class="stat-card"><div class="stat-label">Active restaurants</div><div class="stat-val" id="s-rest">—</div><div class="stat-note">paying partners</div></div>
-    <div class="stat-card"><div class="stat-label">Monthly revenue</div><div class="stat-val" id="s-rev">$0</div><div class="stat-note">B2B subscriptions</div></div>
+    <div class="stat-card"><div class="stat-label">Monthly revenue</div><div class="stat-val" id="s-rev">$0</div><div class="stat-note">estimated</div></div>
   </div>
 
   <div class="dash-tabs">
-    <button class="dtab active" onclick="showTab('restaurants', this)">Restaurants</button>
-    <button class="dtab" onclick="showTab('customers', this)">Customers</button>
-    <button class="dtab" onclick="showTab('activity', this)">Activity log</button>
-    <button class="dtab" onclick="showTab('revenue', this)">Revenue</button>
+    <button class="dtab active" onclick="showTab('restaurants',this)">🏪 Restaurants</button>
+    <button class="dtab" onclick="showTab('discounts',this)">🏷 Discount Codes</button>
+    <button class="dtab" onclick="showTab('universities',this)">🎓 Universities</button>
+    <button class="dtab" onclick="showTab('students',this)">👤 Students</button>
+    <button class="dtab" onclick="showTab('customers',this)">💳 Customers</button>
+    <button class="dtab" onclick="showTab('activity',this)">📋 Activity</button>
+    <button class="dtab" onclick="showTab('revenue',this)">💰 Revenue</button>
   </div>
 
-  <!-- RESTAURANTS TAB -->
+  <!-- ═══ RESTAURANTS TAB ═══ -->
   <div id="tab-restaurants" class="tab-section active">
-    <!-- Create new restaurant -->
-    <div class="create-panel">
-      <div class="create-title">Add new restaurant partner</div>
-      <div class="create-sub">Create a login account for a restaurant. Give them their email and password once done.</div>
-      <div class="create-grid">
-        <div class="fg">
-          <label>Restaurant name</label>
-          <input type="text" id="cr-name" placeholder="e.g. Shawarma Palace">
-        </div>
-        <div class="fg">
-          <label>Login email</label>
-          <input type="email" id="cr-email" placeholder="restaurant@example.com">
-        </div>
-        <div class="fg">
-          <label>Password</label>
-          <input type="text" id="cr-pw" placeholder="Create a password for them">
-        </div>
-        <button class="btn-create" id="btn-create-rest" onclick="createRestaurant()">Create account</button>
+    <div class="panel">
+      <div class="panel-title">Add new restaurant partner</div>
+      <div class="panel-sub">Create a login account for a restaurant. Give them their email and password once done.</div>
+      <div class="form-row cols4">
+        <div class="fg fg-inline"><label>Restaurant name</label><input type="text" id="cr-name" placeholder="Shawarma Palace"></div>
+        <div class="fg fg-inline"><label>Login email</label><input type="email" id="cr-email" placeholder="restaurant@example.com"></div>
+        <div class="fg fg-inline"><label>Password</label><input type="text" id="cr-pw" placeholder="Create a password"></div>
+        <button class="btn-action" onclick="createRestaurant()">Create account</button>
       </div>
-      <div class="create-err" id="create-err">—</div>
-      <div class="create-success" id="create-success">—</div>
+      <div class="err-msg" id="cr-err">—</div>
+      <div class="suc-msg" id="cr-suc">—</div>
     </div>
-
-    <!-- Restaurant list -->
     <div class="table-card">
       <div class="table-top"><div class="table-title">All partner restaurants</div></div>
       <div class="thead" style="grid-template-columns:2fr 2fr 1fr 1fr 180px"><div>Restaurant</div><div>Email</div><div>Joined</div><div>Status</div><div>Actions</div></div>
@@ -261,11 +296,135 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
     </div>
   </div>
 
-  <!-- CUSTOMERS TAB -->
+  <!-- ═══ DISCOUNT CODES TAB ═══ -->
+  <div id="tab-discounts" class="tab-section">
+    <div class="panel">
+      <div class="panel-title">Create discount code for a partner shop</div>
+      <div class="panel-sub">Each partner shop gets their own unique discount code. Students show this code at checkout to claim their discount.</div>
+      <div class="form-row cols5">
+        <div class="fg fg-inline"><label>Shop name</label><input type="text" id="dc-shop" placeholder="TechZone Damascus"></div>
+        <div class="fg fg-inline">
+          <label>Category</label>
+          <select id="dc-cat">
+            <option value="">Select category</option>
+            <option>🍔 Food & cafes</option>
+            <option>💻 Electronics & tech</option>
+            <option>👕 Clothing</option>
+            <option>💊 Pharmacy</option>
+            <option>🏋️ Gym & sports</option>
+            <option>📚 Books & stationery</option>
+            <option>✂️ Salon & barber</option>
+            <option>🚌 Transport</option>
+            <option>🛍️ Other</option>
+          </select>
+        </div>
+        <div class="fg fg-inline"><label>Discount %</label><input type="number" id="dc-pct" placeholder="20" min="1" max="90"></div>
+        <div class="fg fg-inline"><label>Code (auto or custom)</label><input type="text" id="dc-code" placeholder="e.g. WAFA-TECH20" style="text-transform:uppercase"></div>
+        <button class="btn-action" onclick="createDiscount()">Create code</button>
+      </div>
+      <div class="err-msg" id="dc-err">—</div>
+      <div class="suc-msg" id="dc-suc">—</div>
+    </div>
+    <div class="table-card">
+      <div class="table-top"><div class="table-title">All discount codes</div></div>
+      <div class="thead" style="grid-template-columns:2fr 1.5fr 1fr 1fr 1fr 120px"><div>Shop</div><div>Category</div><div>Discount</div><div>Code</div><div>Status</div><div>Actions</div></div>
+      <div id="disc-body"><div class="loading"><span class="spin"></span>Loading...</div></div>
+    </div>
+  </div>
+
+  <!-- ═══ UNIVERSITIES TAB ═══ -->
+  <div id="tab-universities" class="tab-section">
+
+    <!-- Create university + enrollment code -->
+    <div class="panel">
+      <div class="panel-title">Add university partner</div>
+      <div class="panel-sub">Creates an enrollment code for the university and generates a QR code you can print and place at the registration desk.</div>
+      <div class="form-row cols4" style="margin-bottom:10px">
+        <div class="fg fg-inline"><label>University name</label><input type="text" id="un-name" placeholder="University of Damascus"></div>
+        <div class="fg fg-inline">
+          <label>Plan included</label>
+          <select id="un-plan">
+            <option value="monthly">Monthly — 50,000 SYP/mo</option>
+            <option value="annual">Annual — 500,000 SYP/yr</option>
+          </select>
+        </div>
+        <div class="fg fg-inline"><label>Enrollment code</label><input type="text" id="un-code" placeholder="e.g. UDAMASCUS2026" style="text-transform:uppercase"><div class="hint">Leave blank to auto-generate</div></div>
+        <button class="btn-action" onclick="createUniversity()">Create & generate QR</button>
+      </div>
+      <div class="err-msg" id="un-err">—</div>
+      <div class="suc-msg" id="un-suc">—</div>
+
+      <!-- QR Result -->
+      <div class="qr-result" id="uni-qr-result">
+        <div class="qr-label" id="uni-qr-label">QR Code for University</div>
+        <div id="uni-qrcode" style="display:inline-block"></div>
+        <div class="qr-sub" id="uni-qr-sub">Students scan this at the registration desk to enroll instantly</div>
+        <br>
+        <button class="btn-print" onclick="printQR()">🖨 Print QR code</button>
+      </div>
+    </div>
+
+    <!-- Existing universities -->
+    <div class="table-card">
+      <div class="table-top"><div class="table-title">Partner universities</div></div>
+      <div class="thead" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr 160px"><div>University</div><div>Code</div><div>Plan</div><div>Students</div><div>Status</div><div>Actions</div></div>
+      <div id="uni-body"><div class="loading"><span class="spin"></span>Loading...</div></div>
+    </div>
+
+    <!-- Bulk Excel Upload -->
+    <div class="panel">
+      <div class="panel-title">Bulk student activation from Excel</div>
+      <div class="panel-sub">Upload an Excel file with student data to bulk-create accounts. Required columns: <strong>name, phone, age, studentId</strong>. All students will be activated automatically.</div>
+      <div class="fg" style="margin-bottom:10px">
+        <label>Select university for this upload</label>
+        <select id="bulk-uni">
+          <option value="">Select university</option>
+        </select>
+      </div>
+      <div class="fg" style="margin-bottom:10px">
+        <label>Plan for these students</label>
+        <select id="bulk-plan">
+          <option value="annual">Annual — included in registration</option>
+          <option value="monthly">Monthly</option>
+        </select>
+      </div>
+      <div class="upload-area" onclick="document.getElementById('excel-input').click()">
+        <div class="upload-icon">📊</div>
+        <div class="upload-txt">Click to upload Excel file</div>
+        <div class="upload-sub">.xlsx or .xls — columns: name, phone, age, studentId</div>
+        <input type="file" id="excel-input" accept=".xlsx,.xls" style="display:none" onchange="handleExcel(this)">
+      </div>
+      <div class="upload-preview" id="upload-preview">
+        <div style="font-size:13px;font-weight:500;margin-bottom:8px" id="preview-count">—</div>
+        <div style="overflow-x:auto;max-height:240px;overflow-y:auto;border:1px solid var(--bdr);border-radius:var(--rs)">
+          <table class="preview-table" id="preview-table"></table>
+        </div>
+        <div style="margin-top:12px;display:flex;gap:10px;align-items:center">
+          <button class="btn-action" id="btn-bulk-upload" onclick="bulkCreateStudents()">Activate all students</button>
+          <div class="suc-msg" id="bulk-suc" style="margin:0">—</div>
+          <div class="err-msg" id="bulk-err" style="margin:0">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ STUDENTS TAB ═══ -->
+  <div id="tab-students" class="tab-section">
+    <div class="table-card">
+      <div class="table-top">
+        <div class="table-title">All students</div>
+        <input class="search-input" type="text" placeholder="Search name or phone..." oninput="filterStudents(this.value)">
+      </div>
+      <div class="thead" style="grid-template-columns:2fr 1.5fr 1.5fr 1fr 1fr 1fr 160px"><div>Name</div><div>Phone</div><div>University</div><div>Plan</div><div>Status</div><div>Points</div><div>Actions</div></div>
+      <div id="student-body"><div class="loading"><span class="spin"></span>Loading...</div></div>
+    </div>
+  </div>
+
+  <!-- ═══ CUSTOMERS TAB ═══ -->
   <div id="tab-customers" class="tab-section">
     <div class="table-card">
       <div class="table-top">
-        <div class="table-title">All customers</div>
+        <div class="table-title">Loyalty card customers</div>
         <input class="search-input" type="text" placeholder="Search name or phone..." oninput="filterCustomers(this.value)">
       </div>
       <div class="thead" style="grid-template-columns:2fr 1.5fr 1fr 1fr 1fr"><div>Name</div><div>Phone</div><div>Age</div><div>Tier</div><div>Points</div></div>
@@ -273,45 +432,48 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
     </div>
   </div>
 
-  <!-- ACTIVITY TAB -->
+  <!-- ═══ ACTIVITY TAB ═══ -->
   <div id="tab-activity" class="tab-section">
     <div class="table-card">
       <div class="table-top"><div class="table-title">Recent activity</div></div>
-      <div class="athhead"><div>Customer</div><div>Restaurant</div><div>Points</div><div>Time</div></div>
+      <div class="thead" style="grid-template-columns:2fr 2fr 1fr 1fr"><div>Customer</div><div>Restaurant</div><div>Points</div><div>Time</div></div>
       <div id="act-body"><div class="loading"><span class="spin"></span>Loading...</div></div>
     </div>
   </div>
 
-  <!-- REVENUE TAB -->
+  <!-- ═══ REVENUE TAB ═══ -->
   <div id="tab-revenue" class="tab-section">
     <div class="rev-grid">
       <div class="rev-card">
-        <div class="rev-title">Monthly B2B revenue</div>
-        <div class="rev-row"><div class="rev-lbl">Restaurant subscriptions</div><div class="rev-val" id="r-subs">$0</div></div>
-        <div class="rev-row"><div class="rev-lbl">Setup fees (one-time)</div><div class="rev-val">$0</div></div>
-        <div class="rev-row"><div class="rev-lbl">Analytics upsell</div><div class="rev-val">$0</div></div>
-        <div class="rev-total"><span>Total monthly</span><span id="r-total">$0</span></div>
+        <div class="rev-title">Estimated monthly revenue</div>
+        <div class="rev-row"><div class="rev-lbl">Restaurant subscriptions</div><div class="rev-val" id="r-rest">$0</div></div>
+        <div class="rev-row"><div class="rev-lbl">Student monthly passes</div><div class="rev-val" id="r-stumo">0 SYP</div></div>
+        <div class="rev-row"><div class="rev-lbl">Student annual passes (÷12)</div><div class="rev-val" id="r-stuann">0 SYP</div></div>
+        <div class="rev-row"><div class="rev-lbl">Shop listing fees</div><div class="rev-val" id="r-shops">$0</div></div>
+        <div class="rev-total"><span>Total (approx)</span><span id="r-total">—</span></div>
       </div>
       <div class="rev-card">
         <div class="rev-title">Pricing model</div>
-        <div class="rev-row"><div class="rev-lbl">Basic restaurant plan</div><div class="rev-val">$20/mo</div></div>
-        <div class="rev-row"><div class="rev-lbl">Pro restaurant plan</div><div class="rev-val">$60/mo</div></div>
-        <div class="rev-row"><div class="rev-lbl">Student pass</div><div class="rev-val">25k SYP/mo</div></div>
-        <div class="rev-row"><div class="rev-lbl">Student pro</div><div class="rev-val">60k SYP/mo</div></div>
+        <div class="rev-row"><div class="rev-lbl">Restaurant basic plan</div><div class="rev-val">$20/mo</div></div>
+        <div class="rev-row"><div class="rev-lbl">Restaurant pro plan</div><div class="rev-val">$60/mo</div></div>
+        <div class="rev-row"><div class="rev-lbl">Student monthly pass</div><div class="rev-val">50,000 SYP</div></div>
+        <div class="rev-row"><div class="rev-lbl">Student annual pass</div><div class="rev-val">500,000 SYP</div></div>
+        <div class="rev-row"><div class="rev-lbl">Shop listing fee</div><div class="rev-val">$15/mo</div></div>
+        <div class="rev-row"><div class="rev-lbl">WhatsApp promo blast</div><div class="rev-val">$30/campaign</div></div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- CONFIRM DELETE MODAL -->
+<!-- CONFIRM MODAL -->
 <div class="modal-overlay" id="modal">
   <div class="modal">
     <div class="modal-icon">⚠️</div>
-    <div class="modal-title" id="modal-title">Delete restaurant?</div>
-    <div class="modal-msg" id="modal-msg">This will permanently delete this restaurant account. This cannot be undone.</div>
+    <div class="modal-title" id="modal-title">Confirm action</div>
+    <div class="modal-msg" id="modal-msg">Are you sure?</div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal()">Cancel</button>
-      <button class="btn-confirm-del" id="modal-confirm">Delete</button>
+      <button class="btn-confirm-del" id="modal-confirm">Confirm</button>
     </div>
   </div>
 </div>
@@ -320,7 +482,10 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
 
 <script>
 let allCustomers   = [];
+let allStudents    = [];
 let allRestaurants = [];
+let allUniversities = [];
+let excelStudents  = [];
 let pendingAction  = null;
 
 // ── AUTH ──
@@ -338,12 +503,10 @@ function showLoginErr(msg) {
   document.getElementById('login-err').textContent = msg;
   document.getElementById('login-err').classList.add('show');
 }
-
 async function doLogin() {
   const email = document.getElementById('a-email').value.trim();
   const pw    = document.getElementById('a-pw').value;
-  const errEl = document.getElementById('login-err');
-  errEl.classList.remove('show');
+  document.getElementById('login-err').classList.remove('show');
   if (!email || !pw) { showLoginErr('Enter email and password'); return; }
   const btn = document.getElementById('btn-login');
   btn.disabled = true; btn.textContent = 'Signing in...';
@@ -354,11 +517,7 @@ async function doLogin() {
     btn.disabled = false; btn.textContent = 'Sign in';
   }
 }
-
-async function doSignOut() {
-  await window.fbFns.signOut(window.auth);
-  toast('Signed out');
-}
+async function doSignOut() { await window.fbFns.signOut(window.auth); toast('Signed out'); }
 
 // ── TABS ──
 function showTab(id, el) {
@@ -368,204 +527,496 @@ function showTab(id, el) {
   el.classList.add('active');
 }
 
-// ── CREATE RESTAURANT ──
-async function createRestaurant() {
-  const name  = document.getElementById('cr-name').value.trim();
-  const email = document.getElementById('cr-email').value.trim();
-  const pw    = document.getElementById('cr-pw').value.trim();
-  const errEl = document.getElementById('create-err');
-  const sucEl = document.getElementById('create-success');
-  errEl.classList.remove('show'); sucEl.classList.remove('show');
-
-  if (!name || !email || !pw) { errEl.textContent = 'Fill in all fields.'; errEl.classList.add('show'); return; }
-  if (pw.length < 6)          { errEl.textContent = 'Password must be at least 6 characters.'; errEl.classList.add('show'); return; }
-
-  const btn = document.getElementById('btn-create-rest');
-  btn.disabled = true; btn.textContent = 'Creating...';
-
-  try {
-    const { createUserWithEmailAndPassword, collection, addDoc, serverTimestamp } = window.fbFns;
-
-    // Create Firebase Auth account for the restaurant
-    const cred = await createUserWithEmailAndPassword(window.auth, email, pw);
-
-    // Save restaurant document in Firestore
-    await addDoc(collection(window.db, 'restaurants'), {
-      uid: cred.user.uid,
-      name, email,
-      disabled: false,
-      createdAt: serverTimestamp()
-    });
-
-    sucEl.textContent = `✓ Account created for "${name}". Email: ${email} · Password: ${pw}`;
-    sucEl.classList.add('show');
-    document.getElementById('cr-name').value  = '';
-    document.getElementById('cr-email').value = '';
-    document.getElementById('cr-pw').value    = '';
-
-    toast('✓ Restaurant account created');
-    loadAll(); // refresh table
-  } catch(e) {
-    let msg = e.message;
-    if (e.code === 'auth/email-already-in-use') msg = 'This email already has an account.';
-    if (e.code === 'auth/invalid-email')        msg = 'Invalid email address.';
-    errEl.textContent = msg; errEl.classList.add('show');
-  } finally {
-    btn.disabled = false; btn.textContent = 'Create account';
-  }
-}
-
-// ── DISABLE / ENABLE RESTAURANT ──
-async function toggleRestaurant(docId, currentlyDisabled, name) {
-  try {
-    const { doc, updateDoc } = window.fbFns;
-    await updateDoc(doc(window.db, 'restaurants', docId), { disabled: !currentlyDisabled });
-    const action = currentlyDisabled ? 'enabled' : 'disabled';
-    toast(`✓ "${name}" ${action}`);
-    loadAll();
-  } catch(e) { toast('Error: ' + e.message, true); }
-}
-
-// ── DELETE RESTAURANT ──
-function confirmDelete(docId, name) {
-  pendingAction = { docId, name };
-  document.getElementById('modal-title').textContent = 'Delete "' + name + '"?';
-  document.getElementById('modal-msg').textContent   = 'This will permanently delete the Firestore record for "' + name + '". Their login account will also be removed. This cannot be undone.';
-  document.getElementById('modal-confirm').onclick   = () => deleteRestaurant(docId, name);
+// ── MODAL ──
+function showModal(title, msg, onConfirm) {
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-msg').textContent   = msg;
+  document.getElementById('modal-confirm').onclick   = () => { closeModal(); onConfirm(); };
   document.getElementById('modal').classList.add('show');
 }
+function closeModal() { document.getElementById('modal').classList.remove('show'); }
+document.getElementById('modal').addEventListener('click', e => { if (e.target === document.getElementById('modal')) closeModal(); });
 
-function closeModal() {
-  document.getElementById('modal').classList.remove('show');
-  pendingAction = null;
-}
-
-async function deleteRestaurant(docId, name) {
-  closeModal();
-  try {
-    const { doc, deleteDoc } = window.fbFns;
-    await deleteDoc(doc(window.db, 'restaurants', docId));
-    toast(`✓ "${name}" deleted`);
-    loadAll();
-  } catch(e) { toast('Error: ' + e.message, true); }
-}
-
-// ── LOAD ALL DATA ──
+// ── LOAD ALL ──
 async function loadAll() {
   try {
-    const { collection, getDocs, query, orderBy, limit } = window.fbFns;
-    const [custSnap, actSnap, restSnap] = await Promise.all([
+    const { collection, getDocs, query, orderBy, limit, where } = window.fbFns;
+    const [custSnap, actSnap, restSnap, discSnap, uniSnap] = await Promise.all([
       getDocs(collection(window.db, 'customers')),
-      getDocs(query(collection(window.db, 'activity'), orderBy('timestamp', 'desc'), limit(50))),
-      getDocs(collection(window.db, 'restaurants'))
+      getDocs(query(collection(window.db, 'activity'), orderBy('timestamp','desc'), limit(50))),
+      getDocs(collection(window.db, 'restaurants')),
+      getDocs(collection(window.db, 'discountCodes')),
+      getDocs(collection(window.db, 'universityCodes'))
     ]);
 
-    // Stats
+    // Separate customers and students
+    allCustomers = []; allStudents = [];
+    custSnap.forEach(d => {
+      const data = { id: d.id, ...d.data() };
+      if (data.isStudent) allStudents.push(data);
+      else allCustomers.push(data);
+    });
+
     const activeRests = [];
-    restSnap.forEach(d => { if (!d.data().disabled) activeRests.push(d); });
-    document.getElementById('s-cust').textContent   = custSnap.size;
-    document.getElementById('s-stamps').textContent = actSnap.size;
-    document.getElementById('s-rest').textContent   = activeRests.length;
-    const rev = activeRests.length * 20;
-    document.getElementById('s-rev').textContent   = '$' + rev;
-    document.getElementById('r-subs').textContent  = '$' + rev;
-    document.getElementById('r-total').textContent = '$' + rev;
-
-    // Restaurants table
     allRestaurants = [];
-    restSnap.forEach(d => allRestaurants.push({ id: d.id, ...d.data() }));
-    renderRestaurants(allRestaurants);
+    restSnap.forEach(d => {
+      const data = { id: d.id, ...d.data() };
+      allRestaurants.push(data);
+      if (!data.disabled) activeRests.push(data);
+    });
 
-    // Customers table
-    allCustomers = [];
-    custSnap.forEach(d => allCustomers.push({ id: d.id, ...d.data() }));
+    allUniversities = [];
+    uniSnap.forEach(d => allUniversities.push({ id: d.id, ...d.data() }));
+
+    const pendingStudents = allStudents.filter(s => !s.activated);
+    const activeStudents  = allStudents.filter(s => s.activated);
+    const monthlyStudents = activeStudents.filter(s => s.plan === 'monthly');
+    const annualStudents  = activeStudents.filter(s => s.plan === 'annual');
+
+    // Stats
+    document.getElementById('s-cust').textContent     = allCustomers.length;
+    document.getElementById('s-students').textContent = activeStudents.length;
+    document.getElementById('s-pending').textContent  = pendingStudents.length;
+    document.getElementById('s-rest').textContent     = activeRests.length;
+
+    const restRev   = activeRests.length * 20;
+    const shopCount = discSnap.size;
+    const shopRev   = shopCount * 15;
+    const stuMoRev  = monthlyStudents.length * 50000;
+    const stuAnnRev = Math.round((annualStudents.length * 500000) / 12);
+    document.getElementById('s-rev').textContent    = '$' + (restRev + shopRev);
+    document.getElementById('r-rest').textContent   = '$' + restRev;
+    document.getElementById('r-shops').textContent  = '$' + shopRev;
+    document.getElementById('r-stumo').textContent  = stuMoRev.toLocaleString() + ' SYP';
+    document.getElementById('r-stuann').textContent = stuAnnRev.toLocaleString() + ' SYP';
+    document.getElementById('r-total').textContent  = '$' + (restRev + shopRev) + ' + ' + (stuMoRev + stuAnnRev).toLocaleString() + ' SYP';
+
+    // Render all tables
+    renderRestaurants(allRestaurants);
+    renderDiscounts(discSnap);
+    renderUniversities(allUniversities);
+    renderStudents(allStudents);
     renderCustomers(allCustomers);
 
-    // Activity table
+    // Populate university dropdown for bulk upload
+    const sel = document.getElementById('bulk-uni');
+    sel.innerHTML = '<option value="">Select university</option>';
+    allUniversities.forEach(u => {
+      sel.innerHTML += `<option value="${u.universityName}">${u.universityName}</option>`;
+    });
+
+    // Activity
     const ab = document.getElementById('act-body');
     if (actSnap.empty) { ab.innerHTML = '<div class="empty">No activity yet</div>'; }
     else {
       ab.innerHTML = '';
       actSnap.forEach(d => {
-        const a    = d.data();
-        const time = a.timestamp
-          ? new Date(a.timestamp.seconds*1000).toLocaleDateString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })
-          : '—';
-        ab.innerHTML += `<div class="athrow"><div style="font-weight:500">${a.customerName}</div><div style="color:var(--txs)">${a.restaurant}</div><div style="color:var(--g);font-weight:500">+${a.pointsAdded} pts</div><div style="color:var(--txs);font-size:12px">${time}</div></div>`;
+        const a = d.data();
+        const time = a.timestamp ? new Date(a.timestamp.seconds*1000).toLocaleDateString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '—';
+        ab.innerHTML += `<div class="trow" style="grid-template-columns:2fr 2fr 1fr 1fr"><div style="font-weight:500">${a.customerName}</div><div style="color:var(--txs)">${a.restaurant}</div><div style="color:var(--g);font-weight:500">+${a.pointsAdded}</div><div style="color:var(--txs);font-size:12px">${time}</div></div>`;
       });
     }
-
   } catch(e) { console.error(e); toast('Error loading data', true); }
+}
+
+// ── RESTAURANTS ──
+async function createRestaurant() {
+  const name  = document.getElementById('cr-name').value.trim();
+  const email = document.getElementById('cr-email').value.trim();
+  const pw    = document.getElementById('cr-pw').value.trim();
+  const errEl = document.getElementById('cr-err');
+  const sucEl = document.getElementById('cr-suc');
+  errEl.classList.remove('show'); sucEl.classList.remove('show');
+  if (!name || !email || !pw) { errEl.textContent='Fill all fields'; errEl.classList.add('show'); return; }
+  if (pw.length < 6) { errEl.textContent='Password must be 6+ characters'; errEl.classList.add('show'); return; }
+  const btn = document.querySelector('#tab-restaurants .btn-action');
+  btn.disabled = true; btn.textContent = 'Creating...';
+  try {
+    const { createUserWithEmailAndPassword, collection, addDoc, serverTimestamp } = window.fbFns;
+    const cred = await createUserWithEmailAndPassword(window.auth, email, pw);
+    await addDoc(collection(window.db,'restaurants'), { uid:cred.user.uid, name, email, disabled:false, createdAt:serverTimestamp() });
+    sucEl.textContent = `✓ Created "${name}" — Email: ${email} · Password: ${pw}`;
+    sucEl.classList.add('show');
+    document.getElementById('cr-name').value = '';
+    document.getElementById('cr-email').value = '';
+    document.getElementById('cr-pw').value = '';
+    toast('✓ Restaurant account created');
+    loadAll();
+  } catch(e) {
+    let msg = e.message;
+    if (e.code === 'auth/email-already-in-use') msg = 'This email already has an account.';
+    errEl.textContent = msg; errEl.classList.add('show');
+  } finally { btn.disabled=false; btn.textContent='Create account'; }
 }
 
 function renderRestaurants(list) {
   const el = document.getElementById('rest-body');
-  if (!list.length) { el.innerHTML = '<div class="empty">No restaurants yet — create the first one above</div>'; return; }
+  if (!list.length) { el.innerHTML='<div class="empty">No restaurants yet</div>'; return; }
   el.innerHTML = '';
   list.forEach(r => {
-    const joined   = r.createdAt ? new Date(r.createdAt.seconds*1000).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' }) : '—';
+    const joined   = r.createdAt ? new Date(r.createdAt.seconds*1000).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '—';
     const disabled = r.disabled === true;
-    const statusBadge  = disabled
-      ? '<span class="badge badge-disabled">⏸ Disabled</span>'
-      : '<span class="badge badge-active">● Active</span>';
+    const badge    = disabled ? '<span class="badge badge-disabled">⏸ Disabled</span>' : '<span class="badge badge-active">● Active</span>';
     const toggleBtn = disabled
-      ? `<button class="btn-sm btn-enable" onclick="toggleRestaurant('${r.id}', true, '${r.name}')">Enable</button>`
-      : `<button class="btn-sm btn-disable" onclick="toggleRestaurant('${r.id}', false, '${r.name}')">Disable</button>`;
-
-    el.innerHTML += `
-      <div class="trow" style="grid-template-columns:2fr 2fr 1fr 1fr 180px">
-        <div class="tname">${r.name}</div>
-        <div style="color:var(--txs);font-size:12px">${r.email}</div>
-        <div style="color:var(--txs);font-size:12px">${joined}</div>
-        <div>${statusBadge}</div>
-        <div class="action-btns">
-          ${toggleBtn}
-          <button class="btn-sm btn-delete" onclick="confirmDelete('${r.id}', '${r.name}')">Delete</button>
-        </div>
-      </div>`;
+      ? `<button class="btn-sm btn-enable" onclick="toggleRestaurant('${r.id}',true,'${r.name}')">Enable</button>`
+      : `<button class="btn-sm btn-disable" onclick="toggleRestaurant('${r.id}',false,'${r.name}')">Disable</button>`;
+    el.innerHTML += `<div class="trow" style="grid-template-columns:2fr 2fr 1fr 1fr 180px"><div class="tname">${r.name}</div><div style="color:var(--txs);font-size:12px">${r.email}</div><div style="color:var(--txs);font-size:12px">${joined}</div><div>${badge}</div><div class="action-btns">${toggleBtn}<button class="btn-sm btn-delete" onclick="confirmDeleteRestaurant('${r.id}','${r.name}')">Delete</button></div></div>`;
   });
 }
 
+async function toggleRestaurant(docId, currentlyDisabled, name) {
+  try {
+    const { doc, updateDoc } = window.fbFns;
+    await updateDoc(doc(window.db,'restaurants',docId), { disabled: !currentlyDisabled });
+    toast(`✓ "${name}" ${currentlyDisabled ? 'enabled' : 'disabled'}`);
+    loadAll();
+  } catch(e) { toast('Error: '+e.message, true); }
+}
+
+function confirmDeleteRestaurant(docId, name) {
+  showModal(`Delete "${name}"?`, 'This permanently deletes the restaurant Firestore record. Cannot be undone.', async () => {
+    try {
+      const { doc, deleteDoc } = window.fbFns;
+      await deleteDoc(doc(window.db,'restaurants',docId));
+      toast(`✓ "${name}" deleted`); loadAll();
+    } catch(e) { toast('Error: '+e.message, true); }
+  });
+}
+
+// ── DISCOUNT CODES ──
+async function createDiscount() {
+  const shop  = document.getElementById('dc-shop').value.trim();
+  const cat   = document.getElementById('dc-cat').value;
+  const pct   = document.getElementById('dc-pct').value;
+  let   code  = document.getElementById('dc-code').value.trim().toUpperCase();
+  const errEl = document.getElementById('dc-err');
+  const sucEl = document.getElementById('dc-suc');
+  errEl.classList.remove('show'); sucEl.classList.remove('show');
+  if (!shop || !cat || !pct) { errEl.textContent='Fill shop name, category, and discount %'; errEl.classList.add('show'); return; }
+  // Auto-generate code if blank
+  if (!code) {
+    const prefix = shop.toUpperCase().replace(/[^A-Z]/g,'').substring(0,4);
+    code = 'WAFA-' + prefix + pct;
+  }
+  const btn = document.querySelector('#tab-discounts .btn-action');
+  btn.disabled=true; btn.textContent='Creating...';
+  try {
+    const { collection, addDoc, serverTimestamp } = window.fbFns;
+    await addDoc(collection(window.db,'discountCodes'), { shopName:shop, category:cat, discountPct:parseInt(pct), code, active:true, createdAt:serverTimestamp() });
+    sucEl.textContent = `✓ Code "${code}" created for ${shop} — ${pct}% off`;
+    sucEl.classList.add('show');
+    document.getElementById('dc-shop').value='';
+    document.getElementById('dc-pct').value='';
+    document.getElementById('dc-code').value='';
+    toast('✓ Discount code created');
+    loadAll();
+  } catch(e) { errEl.textContent=e.message; errEl.classList.add('show'); }
+  finally { btn.disabled=false; btn.textContent='Create code'; }
+}
+
+function renderDiscounts(snap) {
+  const el = document.getElementById('disc-body');
+  if (snap.empty || snap.size === 0) { el.innerHTML='<div class="empty">No discount codes yet — create the first one above</div>'; return; }
+  el.innerHTML='';
+  snap.forEach(d => {
+    const data = d.data();
+    const active = data.active !== false;
+    const badge  = active ? '<span class="badge badge-active">● Active</span>' : '<span class="badge badge-disabled">⏸ Off</span>';
+    const toggleLbl = active ? 'Deactivate' : 'Activate';
+    el.innerHTML += `<div class="trow" style="grid-template-columns:2fr 1.5fr 1fr 1fr 1fr 120px">
+      <div class="tname">${data.shopName}</div>
+      <div style="color:var(--txs)">${data.category||'—'}</div>
+      <div style="color:var(--g);font-weight:500">${data.discountPct}% off</div>
+      <div><code style="background:var(--sfc);padding:2px 7px;border-radius:4px;font-size:12px;border:1px solid var(--bdr)">${data.code}</code></div>
+      <div>${badge}</div>
+      <div class="action-btns">
+        <button class="btn-sm btn-copy" onclick="copyCode('${data.code}')">Copy</button>
+        <button class="btn-sm ${active?'btn-disable':'btn-enable'}" onclick="toggleDiscount('${d.id}',${active},'${data.shopName}')">${toggleLbl}</button>
+        <button class="btn-sm btn-delete" onclick="confirmDeleteDiscount('${d.id}','${data.shopName}')">Del</button>
+      </div>
+    </div>`;
+  });
+}
+
+async function toggleDiscount(docId, active, name) {
+  try {
+    const { doc, updateDoc } = window.fbFns;
+    await updateDoc(doc(window.db,'discountCodes',docId), { active: !active });
+    toast(`✓ "${name}" code ${active?'deactivated':'activated'}`); loadAll();
+  } catch(e) { toast('Error: '+e.message, true); }
+}
+
+function confirmDeleteDiscount(docId, name) {
+  showModal(`Delete code for "${name}"?`, 'This permanently removes the discount code.', async () => {
+    try {
+      const { doc, deleteDoc } = window.fbFns;
+      await deleteDoc(doc(window.db,'discountCodes',docId));
+      toast('✓ Discount code deleted'); loadAll();
+    } catch(e) { toast('Error: '+e.message, true); }
+  });
+}
+
+function copyCode(code) {
+  navigator.clipboard.writeText(code).then(() => toast('✓ Code copied: ' + code));
+}
+
+// ── UNIVERSITIES ──
+async function createUniversity() {
+  const name  = document.getElementById('un-name').value.trim();
+  const plan  = document.getElementById('un-plan').value;
+  let   code  = document.getElementById('un-code').value.trim().toUpperCase();
+  const errEl = document.getElementById('un-err');
+  const sucEl = document.getElementById('un-suc');
+  errEl.classList.remove('show'); sucEl.classList.remove('show');
+  if (!name) { errEl.textContent='Enter university name'; errEl.classList.add('show'); return; }
+  // Auto-generate code
+  if (!code) code = 'U' + name.toUpperCase().replace(/[^A-Z]/g,'').substring(0,8) + new Date().getFullYear();
+  const btn = document.querySelector('#tab-universities .btn-action');
+  btn.disabled=true; btn.textContent='Creating...';
+  try {
+    const { collection, addDoc, serverTimestamp } = window.fbFns;
+    await addDoc(collection(window.db,'universityCodes'), { universityName:name, code, plan, active:true, studentCount:0, createdAt:serverTimestamp() });
+    sucEl.textContent = `✓ "${name}" created — Code: ${code}`;
+    sucEl.classList.add('show');
+    // Generate QR
+    generateUniQR(name, code, plan);
+    document.getElementById('un-name').value='';
+    document.getElementById('un-code').value='';
+    toast('✓ University created'); loadAll();
+  } catch(e) { errEl.textContent=e.message; errEl.classList.add('show'); }
+  finally { btn.disabled=false; btn.textContent='Create & generate QR'; }
+}
+
+function generateUniQR(uniName, code, plan) {
+  const qrEl = document.getElementById('uni-qrcode');
+  qrEl.innerHTML = '';
+  const studentUrl = `${window.location.origin}/student/index.html?method=code&uni=${encodeURIComponent(uniName)}&code=${code}&plan=${plan}`;
+  new QRCode(qrEl, { text:studentUrl, width:160, height:160, colorDark:'#1e3a5f', colorLight:'#ffffff', correctLevel:QRCode.CorrectLevel.M });
+  document.getElementById('uni-qr-label').textContent = `QR Code — ${uniName}`;
+  document.getElementById('uni-qr-sub').textContent   = `Code: ${code} · Plan: ${plan} · Students scan at registration desk`;
+  document.getElementById('uni-qr-result').classList.add('show');
+}
+
+function regenerateQR(name, code, plan) {
+  showTab('universities', document.querySelectorAll('.dtab')[2]);
+  generateUniQR(name, code, plan);
+  document.getElementById('uni-qr-result').scrollIntoView({ behavior:'smooth' });
+}
+
+function printQR() {
+  const qrEl  = document.getElementById('uni-qrcode');
+  const label = document.getElementById('uni-qr-label').textContent;
+  const sub   = document.getElementById('uni-qr-sub').textContent;
+  const win   = window.open('','_blank');
+  win.document.write(`<html><body style="text-align:center;font-family:sans-serif;padding:40px">
+    <h2 style="margin-bottom:8px">${label}</h2>
+    <p style="color:#6b7280;margin-bottom:20px;font-size:14px">${sub}</p>
+    ${qrEl.innerHTML}
+    <p style="margin-top:20px;font-size:13px;color:#6b7280">Scan with your phone camera to enroll in WafaCard Student</p>
+    </body></html>`);
+  win.document.close();
+  win.print();
+}
+
+function renderUniversities(list) {
+  const el = document.getElementById('uni-body');
+  if (!list.length) { el.innerHTML='<div class="empty">No universities yet — add the first one above</div>'; return; }
+  el.innerHTML='';
+  list.forEach(u => {
+    const active = u.active !== false;
+    const badge  = active ? '<span class="badge badge-active">● Active</span>' : '<span class="badge badge-disabled">⏸ Off</span>';
+    el.innerHTML += `<div class="trow" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr 160px">
+      <div class="tname">${u.universityName}</div>
+      <div><code style="background:var(--sfc);padding:2px 6px;border-radius:4px;font-size:11px;border:1px solid var(--bdr)">${u.code}</code></div>
+      <div style="color:var(--txs);font-size:12px">${u.plan==='annual'?'Annual':'Monthly'}</div>
+      <div style="color:var(--txs)">${u.studentCount||0}</div>
+      <div>${badge}</div>
+      <div class="action-btns">
+        <button class="btn-sm btn-activate" onclick="regenerateQR('${u.universityName}','${u.code}','${u.plan}')">QR</button>
+        <button class="btn-sm btn-copy" onclick="copyCode('${u.code}')">Copy code</button>
+        <button class="btn-sm btn-delete" onclick="confirmDeleteUni('${u.id}','${u.universityName}')">Delete</button>
+      </div>
+    </div>`;
+  });
+}
+
+function confirmDeleteUni(docId, name) {
+  showModal(`Delete "${name}"?`, 'This removes the university enrollment code. Existing students keep their accounts.', async () => {
+    try {
+      const { doc, deleteDoc } = window.fbFns;
+      await deleteDoc(doc(window.db,'universityCodes',docId));
+      toast('✓ University deleted'); loadAll();
+    } catch(e) { toast('Error: '+e.message, true); }
+  });
+}
+
+// ── EXCEL BULK UPLOAD ──
+function handleExcel(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const wb   = XLSX.read(e.target.result, { type:'binary' });
+      const ws   = wb.Sheets[wb.SheetNames[0]];
+      const data = XLSX.utils.sheet_to_json(ws);
+      if (!data.length) { toast('Excel file is empty', true); return; }
+      // Validate required columns
+      const required = ['name','phone'];
+      const cols = Object.keys(data[0]).map(k => k.toLowerCase());
+      const missing = required.filter(r => !cols.includes(r));
+      if (missing.length) { toast('Missing columns: ' + missing.join(', '), true); return; }
+      // Normalize keys to lowercase
+      excelStudents = data.map(row => {
+        const normalized = {};
+        Object.keys(row).forEach(k => normalized[k.toLowerCase()] = row[k]);
+        return normalized;
+      });
+      renderExcelPreview(excelStudents);
+    } catch(e) { toast('Error reading file: ' + e.message, true); }
+  };
+  reader.readAsBinaryString(file);
+}
+
+function renderExcelPreview(students) {
+  document.getElementById('preview-count').textContent = `${students.length} students found — review before activating`;
+  const table = document.getElementById('preview-table');
+  table.innerHTML = `<tr><th>#</th><th>Name</th><th>Phone</th><th>Age</th><th>Student ID</th></tr>` +
+    students.slice(0,10).map((s,i) => `<tr><td>${i+1}</td><td>${s.name||'—'}</td><td>${s.phone||'—'}</td><td>${s.age||'—'}</td><td>${s.studentid||s.student_id||s.id||'—'}</td></tr>`).join('') +
+    (students.length > 10 ? `<tr><td colspan="5" style="color:var(--txs);text-align:center">... and ${students.length-10} more</td></tr>` : '');
+  document.getElementById('upload-preview').classList.add('show');
+}
+
+async function bulkCreateStudents() {
+  const uni  = document.getElementById('bulk-uni').value;
+  const plan = document.getElementById('bulk-plan').value;
+  const errEl = document.getElementById('bulk-err');
+  const sucEl = document.getElementById('bulk-suc');
+  errEl.classList.remove('show'); sucEl.classList.remove('show');
+  if (!uni)              { errEl.textContent='Select a university'; errEl.classList.add('show'); return; }
+  if (!excelStudents.length) { errEl.textContent='Upload an Excel file first'; errEl.classList.add('show'); return; }
+  const btn = document.getElementById('btn-bulk-upload');
+  btn.disabled=true; btn.textContent=`Activating 0/${excelStudents.length}...`;
+  let success=0, failed=0;
+  const { createUserWithEmailAndPassword, collection, addDoc, serverTimestamp } = window.fbFns;
+  for (let i=0; i<excelStudents.length; i++) {
+    const s = excelStudents[i];
+    if (!s.name || !s.phone) { failed++; continue; }
+    try {
+      const phone  = String(s.phone).replace(/\s+/g,'');
+      const email  = phone.replace(/[^0-9+]/g,'') + '@wafacard.sy';
+      const pw     = 'Wafa' + phone.slice(-4); // default password: Wafa + last 4 digits
+      const cardId = 'WFCS-' + Math.floor(1000 + Math.random()*9000);
+      const cred   = await createUserWithEmailAndPassword(window.auth, email, pw);
+      await addDoc(collection(window.db,'customers'), {
+        uid:cred.user.uid, cardId, name:s.name, phone,
+        age: s.age ? parseInt(s.age) : null,
+        university: uni,
+        studentId: s.studentid||s.student_id||s.id||null,
+        isStudent:true, plan, enrollMethod:'excel',
+        activated:true,
+        points:0, stamps:0, tier:'Bronze',
+        createdAt:serverTimestamp()
+      });
+      success++;
+      btn.textContent = `Activating ${success}/${excelStudents.length}...`;
+    } catch(e) {
+      if (e.code !== 'auth/email-already-in-use') failed++;
+    }
+  }
+  btn.disabled=false; btn.textContent='Activate all students';
+  sucEl.textContent = `✓ ${success} students activated. ${failed} failed. Default password: Wafa + last 4 digits of phone.`;
+  sucEl.classList.add('show');
+  toast(`✓ ${success} students activated`);
+  loadAll();
+}
+
+// ── STUDENTS ──
+function renderStudents(list) {
+  const el = document.getElementById('student-body');
+  if (!list.length) { el.innerHTML='<div class="empty">No students yet</div>'; return; }
+  el.innerHTML='';
+  list.forEach(s => {
+    const activated = s.activated;
+    const badge = activated
+      ? '<span class="badge badge-active">✓ Active</span>'
+      : '<span class="badge badge-pending">⏳ Pending</span>';
+    const planBadge = `<span class="badge badge-student">${s.plan==='annual'?'Annual':'Monthly'}</span>`;
+    const activateBtn = !activated
+      ? `<button class="btn-sm btn-activate" onclick="activateStudent('${s.id}','${s.name}')">Activate</button>`
+      : '';
+    el.innerHTML += `<div class="trow" style="grid-template-columns:2fr 1.5fr 1.5fr 1fr 1fr 1fr 160px">
+      <div class="tname">${s.name}</div>
+      <div style="color:var(--txs)">${s.phone}</div>
+      <div style="color:var(--txs);font-size:12px">${s.university||'—'}</div>
+      <div>${planBadge}</div>
+      <div>${badge}</div>
+      <div>${s.points||0}</div>
+      <div class="action-btns">
+        ${activateBtn}
+        <button class="btn-sm btn-delete" onclick="confirmDeleteStudent('${s.id}','${s.name}')">Delete</button>
+      </div>
+    </div>`;
+  });
+}
+
+async function activateStudent(docId, name) {
+  try {
+    const { doc, updateDoc } = window.fbFns;
+    await updateDoc(doc(window.db,'customers',docId), { activated:true });
+    toast(`✓ "${name}" activated`); loadAll();
+  } catch(e) { toast('Error: '+e.message, true); }
+}
+
+function confirmDeleteStudent(docId, name) {
+  showModal(`Delete student "${name}"?`, 'This removes their student card record.', async () => {
+    try {
+      const { doc, deleteDoc } = window.fbFns;
+      await deleteDoc(doc(window.db,'customers',docId));
+      toast('✓ Student deleted'); loadAll();
+    } catch(e) { toast('Error: '+e.message, true); }
+  });
+}
+
+function filterStudents(val) {
+  const q = val.toLowerCase();
+  renderStudents(allStudents.filter(s => s.name.toLowerCase().includes(q) || (s.phone||'').includes(q)));
+}
+
+// ── CUSTOMERS ──
 function renderCustomers(list) {
   const el = document.getElementById('cust-body');
-  if (!list.length) { el.innerHTML = '<div class="empty">No customers yet</div>'; return; }
-  el.innerHTML = '';
+  if (!list.length) { el.innerHTML='<div class="empty">No customers yet</div>'; return; }
+  el.innerHTML='';
   list.forEach(c => {
-    const t = getTier(c.points || 0);
-    el.innerHTML += `
-      <div class="trow" style="grid-template-columns:2fr 1.5fr 1fr 1fr 1fr">
-        <div class="tname">${c.name}</div>
-        <div style="color:var(--txs)">${c.phone}</div>
-        <div style="color:var(--txs)">${c.age || '—'}</div>
-        <div><span class="tier-badge ${t.cls}">${t.lbl.replace(/[🥉🥈🥇] /,'')}</span></div>
-        <div>${c.points || 0}</div>
-      </div>`;
+    const t = getTier(c.points||0);
+    el.innerHTML += `<div class="trow" style="grid-template-columns:2fr 1.5fr 1fr 1fr 1fr">
+      <div class="tname">${c.name}</div>
+      <div style="color:var(--txs)">${c.phone}</div>
+      <div style="color:var(--txs)">${c.age||'—'}</div>
+      <div><span class="tier-badge ${t.cls}">${t.lbl.replace(/[🥉🥈🥇] /,'')}</span></div>
+      <div>${c.points||0}</div>
+    </div>`;
   });
 }
 
 function filterCustomers(val) {
-  const q        = val.toLowerCase();
-  const filtered = allCustomers.filter(c => c.name.toLowerCase().includes(q) || (c.phone||'').includes(q));
-  renderCustomers(filtered);
+  const q = val.toLowerCase();
+  renderCustomers(allCustomers.filter(c => c.name.toLowerCase().includes(q) || (c.phone||'').includes(q)));
 }
 
+// ── HELPERS ──
 function getTier(pts) {
-  if (pts >= 1000) return { lbl:'🥇 Gold',   cls:'tg' };
-  if (pts >= 500)  return { lbl:'🥈 Silver', cls:'tsv' };
-  return                   { lbl:'🥉 Bronze', cls:'tbr' };
+  if (pts>=1000) return { lbl:'🥇 Gold',   cls:'tg' };
+  if (pts>=500)  return { lbl:'🥈 Silver', cls:'tsv' };
+  return               { lbl:'🥉 Bronze', cls:'tbr' };
 }
-
 function toast(msg, isErr=false) {
   const t = document.getElementById('toast');
-  t.textContent = msg; t.className = 'toast' + (isErr ? ' err' : '');
+  t.textContent=msg; t.className='toast'+(isErr?' err':'');
   t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 3000);
+  setTimeout(()=>t.classList.remove('show'),3000);
 }
-
-// Close modal on overlay click
-document.getElementById('modal').addEventListener('click', function(e) {
-  if (e.target === this) closeModal();
-});
 </script>
 </body>
 </html>
