@@ -554,13 +554,8 @@ nav { background: var(--bd); padding: 0 2rem; display: flex; align-items: center
         </div>
         <div class="panel">
           <div class="panel-title">Your discounts</div>
-          <div class="discount-grid" id="discount-grid">
-            <div class="discount-card"><div class="disc-icon">🍔</div><div><div class="disc-name">Food & cafes</div><div class="disc-pct">15% off</div><div class="disc-code">WAFA-FOOD</div></div></div>
-            <div class="discount-card"><div class="disc-icon">💻</div><div><div class="disc-name">Electronics</div><div class="disc-pct">10% off</div><div class="disc-code">WAFA-TECH</div></div></div>
-            <div class="discount-card"><div class="disc-icon">👕</div><div><div class="disc-name">Clothing</div><div class="disc-pct">20% off</div><div class="disc-code">WAFA-STYLE</div></div></div>
-            <div class="discount-card"><div class="disc-icon">💊</div><div><div class="disc-name">Pharmacy</div><div class="disc-pct">10% off</div><div class="disc-code">WAFA-CARE</div></div></div>
-            <div class="discount-card"><div class="disc-icon">🏋️</div><div><div class="disc-name">Gym</div><div class="disc-pct">25% off</div><div class="disc-code">WAFA-FIT</div></div></div>
-            <div class="discount-card"><div class="disc-icon">📚</div><div><div class="disc-name">Books</div><div class="disc-pct">15% off</div><div class="disc-code">WAFA-BOOK</div></div></div>
+          <div id="discount-grid" class="discount-grid">
+            <div class="loading" style="grid-column:1/-1"><span class="spin"></span>Loading discounts...</div>
           </div>
         </div>
         <div class="panel">
@@ -846,6 +841,7 @@ function initMyCard() {
     }
     renderCard(window.curCardData);
     loadActivity();
+    loadDiscounts();
     return;
   }
   document.getElementById('mc-loading').style.display = 'block';
@@ -899,6 +895,55 @@ async function loadActivity() {
       el.innerHTML += `<div class="act-row"><div class="act-dot"></div><div>${data.restaurant} — stamp added</div><div class="act-time">${time}</div></div>`;
     });
   } catch(e) { console.error(e); }
+}
+
+async function loadDiscounts() {
+  const el = document.getElementById('discount-grid');
+  try {
+    const { collection, query, where, getDocs } = window.fbFns;
+    const q    = query(collection(window.db, 'discountCodes'), where('active', '==', true));
+    const snap = await getDocs(q);
+
+    if (snap.empty) {
+      el.innerHTML = '<div style="font-size:13px;color:var(--txs);padding:8px 0;grid-column:1/-1">No discounts available yet — check back soon!</div>';
+      return;
+    }
+
+    // Map category to emoji icon
+    const iconMap = {
+      '🍔 Food & cafes':       '🍔',
+      '💻 Electronics & tech': '💻',
+      '👕 Clothing':           '👕',
+      '💊 Pharmacy':           '💊',
+      '🏋️ Gym & sports':      '🏋️',
+      '📚 Books & stationery': '📚',
+      '✂️ Salon & barber':    '✂️',
+      '🚌 Transport':          '🚌',
+      '🛍️ Other':             '🛍️'
+    };
+
+    el.innerHTML = '';
+    snap.forEach(d => {
+      const data = d.data();
+      const icon = iconMap[data.category] || '🏷️';
+      el.innerHTML += `
+        <div class="discount-card">
+          <div class="disc-icon">${icon}</div>
+          <div>
+            <div class="disc-name">${data.shopName}</div>
+            <div class="disc-pct">${data.discountPct}% off</div>
+            <div class="disc-code" onclick="copyDiscCode('${data.code}')" title="Tap to copy" style="cursor:pointer">${data.code} 📋</div>
+          </div>
+        </div>`;
+    });
+  } catch(e) {
+    el.innerHTML = '<div style="font-size:13px;color:var(--txs);padding:8px 0;grid-column:1/-1">Could not load discounts.</div>';
+    console.error(e);
+  }
+}
+
+function copyDiscCode(code) {
+  navigator.clipboard.writeText(code).then(() => toast('✓ Code copied: ' + code));
 }
 
 function getTier(pts) {
