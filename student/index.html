@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WafaCard Student — بطاقة الطالب</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, collection, addDoc, doc, getDoc, query, where, orderBy, limit, getDocs, serverTimestamp }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+  const cfg = {
+    apiKey:"AIzaSyAMlErHOaOAp-11Ww8Ea_wXiRpRYLjKvV4",
+    authDomain:"loyaltycard-73fe9.firebaseapp.com",
+    projectId:"loyaltycard-73fe9",
+    storageBucket:"loyaltycard-73fe9.firebasestorage.app",
+    messagingSenderId:"851290351570",
+    appId:"1:851290351570:web:a7970e26b6170e4806ca0b"
+  };
+
+  const app  = initializeApp(cfg);
+  const db   = getFirestore(app);
+  const auth = getAuth(app);
+  window.db   = db;
+  window.auth = auth;
+  window.fbFns = {
+    collection, addDoc, doc, getDoc, query, where, orderBy, limit, getDocs, serverTimestamp,
+    createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut
+  };
+
+  onAuthStateChanged(auth, async (user) => {
+    window.currentUser = user;
+    if (user) {
+      try {
+        const { collection, query, where, getDocs } = window.fbFns;
+        const q    = query(collection(db, 'customers'), where('uid', '==', user.uid));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          window.curDocId    = snap.docs[0].id;
+          window.curCardData = snap.docs[0].data();
+          // Check if actually a student
+          if (!window.curCardData.isStudent) {
+            await signOut(auth);
+            window.currentUser = null;
+            updateNav(false);
+            return;
+          }
+        }
+      } catch(e) { console.error(e); }
+      updateNav(true);
+      if (document.getElementById('page-mycard').classList.contains('active')) {
+        renderCard(window.curCardData);
+        loadActivity();
+      }
+    } else {
+      window.curDocId    = null;
+      window.curCardData = null;
+      updateNav(false);
+    }
+  });
+
+  window.addEventListener('load', loadHomeStats);
+</script>
+<style>
+:root {
+  --bd: #1e3a5f;
+  --bm: #1a3352;
+  --b: #2563eb;
+  --bl: #bfdbfe;
+  --bp: #eff6ff;
+  --gold: #b45309; --goldl: #fef3c7;
+  --txt: #111827; --txm: #374151; --txs: #6b7280;
+  --bdr: #e5e7eb; --sfc: #f9fafb; --w: #ffffff;
+  --r: 14px; --rs: 8px;
+  --sh: 0 4px 24px rgba(0,0,0,.08);
+  --shl: 0 12px 48px rgba(0,0,0,.14);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'DM Sans', sans-serif; background: #f3f4f6; color: var(--txt); min-height: 100vh; }
+
+/* NAV */
+nav { background: var(--bd); padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; height: 64px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 12px rgba(0,0,0,.2); }
+.logo { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.logo-mark { width: 34px; height: 34px; background: var(--b); border-radius: 9px; display: flex; align-items: center; justify-content: center; font-family: 'Playfair Display', serif; font-size: 17px; color: #fff; font-weight: 600; }
+.logo-text { font-family: 'Playfair Display', serif; font-size: 19px; color: #fff; letter-spacing: -.3px; }
+.logo-text span { color: #93c5fd; }
+.logo-sub { font-size: 10px; color: rgba(255,255,255,.5); letter-spacing: 1px; text-transform: uppercase; margin-top: 1px; }
+.ntabs { display: flex; gap: 4px; align-items: center; }
+.ntab { padding: 7px 16px; border-radius: 7px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; background: transparent; color: rgba(255,255,255,.6); transition: all .18s; font-family: 'DM Sans', sans-serif; }
+.ntab:hover { color: #fff; background: rgba(255,255,255,.08); }
+.ntab.active { background: var(--b); color: #fff; }
+.nav-user { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.15); border-radius: 20px; padding: 5px 14px; font-size: 13px; color: #fff; }
+.nav-user-dot { width: 7px; height: 7px; border-radius: 50%; background: #93c5fd; }
+.btn-logout { background: none; border: 1px solid rgba(255,255,255,.25); border-radius: var(--rs); padding: 6px 12px; font-size: 12px; color: rgba(255,255,255,.7); cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all .18s; }
+.btn-logout:hover { background: rgba(255,255,255,.1); color: #fff; }
+
+/* PAGES */
+.page { display: none; padding: 2rem; max-width: 920px; margin: 0 auto; }
+.page.active { display: block; animation: fu .3s ease; }
+@keyframes fu { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+
+/* HERO */
+.hero { background: var(--bd); border-radius: var(--r); padding: 3.5rem 3rem; color: #fff; margin-bottom: 1.5rem; position: relative; overflow: hidden; }
+.hero::before { content: '🎓'; position: absolute; right: 3rem; top: 50%; transform: translateY(-50%); font-size: 160px; opacity: .05; pointer-events: none; }
+.hero-badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.15); border-radius: 20px; padding: 4px 14px; font-size: 12px; color: #93c5fd; margin-bottom: 1.5rem; letter-spacing: .5px; }
+.hero-title { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 500; line-height: 1.12; margin-bottom: 1rem; max-width: 440px; }
+.hero-title span { color: #93c5fd; }
+.hero-sub { font-size: 15px; color: rgba(255,255,255,.65); max-width: 420px; line-height: 1.7; margin-bottom: 2.5rem; }
+.hero-cta { display: flex; gap: 10px; flex-wrap: wrap; }
+.btn-b { background: var(--b); color: #fff; border: none; border-radius: var(--rs); padding: 12px 24px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all .18s; font-family: 'DM Sans', sans-serif; }
+.btn-b:hover { background: #1d4ed8; transform: translateY(-1px); }
+.btn-b:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+.btn-o { background: rgba(255,255,255,.1); color: #fff; border: 1px solid rgba(255,255,255,.2); border-radius: var(--rs); padding: 12px 24px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all .18s; font-family: 'DM Sans', sans-serif; }
+.btn-o:hover { background: rgba(255,255,255,.18); }
+
+/* STATS */
+.stat-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 1.5rem; }
+.stat-card { background: var(--w); border: 1px solid var(--bdr); border-radius: var(--r); padding: 1.5rem; text-align: center; }
+.stat-num { font-family: 'Playfair Display', serif; font-size: 30px; font-weight: 500; color: var(--bd); margin-bottom: 4px; }
+.stat-lbl { font-size: 12px; color: var(--txs); }
+
+/* BENEFITS */
+.benefits-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 1.5rem; }
+.benefit-card { background: var(--w); border: 1px solid var(--bdr); border-radius: var(--r); padding: 1.5rem; }
+.benefit-icon { font-size: 28px; margin-bottom: 10px; }
+.benefit-card h3 { font-size: 14px; font-weight: 500; margin-bottom: 6px; }
+.benefit-card p { font-size: 13px; color: var(--txs); line-height: 1.6; }
+
+/* PRICING */
+.pricing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 1.5rem; }
+.price-card { background: var(--w); border: 1px solid var(--bdr); border-radius: var(--r); padding: 1.75rem; text-align: center; }
+.price-card.featured { border: 2px solid var(--b); position: relative; }
+.price-badge { background: var(--bp); color: var(--b); font-size: 11px; font-weight: 500; padding: 3px 12px; border-radius: 20px; display: inline-block; margin-bottom: 10px; }
+.price-name { font-size: 14px; font-weight: 500; color: var(--txs); margin-bottom: 8px; }
+.price-amount { font-family: 'Playfair Display', serif; font-size: 32px; color: var(--bd); margin-bottom: 4px; }
+.price-period { font-size: 12px; color: var(--txs); margin-bottom: 1.25rem; }
+.price-saving { background: #dcfce7; color: #166534; font-size: 12px; font-weight: 500; padding: 4px 12px; border-radius: 20px; display: inline-block; margin-bottom: 1.25rem; }
+.price-features { text-align: left; }
+.pf { font-size: 13px; color: var(--txm); padding: 5px 0; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--bdr); }
+.pf:last-child { border-bottom: none; }
+.pf-check { color: var(--b); font-size: 14px; flex-shrink: 0; }
+
+/* ENROLLMENT SECTION */
+.enroll-section { background: var(--w); border: 1px solid var(--bdr); border-radius: var(--r); padding: 2rem; margin-bottom: 1.5rem; box-shadow: var(--sh); }
+.enroll-title { font-family: 'Playfair Display', serif; font-size: 20px; margin-bottom: 6px; }
+.enroll-sub { font-size: 13px; color: var(--txs); margin-bottom: 1.5rem; line-height: 1.55; }
+.enroll-methods { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 1.5rem; }
+.enroll-method { border: 2px solid var(--bdr); border-radius: var(--r); padding: 1.25rem; cursor: pointer; transition: all .18s; text-align: center; }
+.enroll-method:hover { border-color: var(--b); background: var(--bp); }
+.enroll-method.selected { border-color: var(--b); background: var(--bp); }
+.em-icon { font-size: 28px; margin-bottom: 8px; }
+.em-title { font-size: 13px; font-weight: 500; margin-bottom: 4px; }
+.em-sub { font-size: 11px; color: var(--txs); line-height: 1.4; }
+.enroll-form { display: none; }
+.enroll-form.show { display: block; animation: fu .25s ease; }
+
+/* AUTH */
+.auth-wrap { display: flex; align-items: flex-start; justify-content: center; gap: 1.5rem; }
+.auth-box { background: var(--w); border: 1px solid var(--bdr); border-radius: var(--r); padding: 2.25rem; width: 100%; max-width: 440px; box-shadow: var(--sh); }
+.auth-title { font-family: 'Playfair Display', serif; font-size: 24px; font-weight: 500; margin-bottom: 4px; }
+.auth-sub { font-size: 13px; color: var(--txs); margin-bottom: 1.75rem; line-height: 1.55; }
+.fg { margin-bottom: 1rem; }
+.fg label { display: block; font-size: 12px; font-weight: 500; color: var(--txm); margin-bottom: 5px; letter-spacing: .3px; }
+.fg input, .fg select { width: 100%; padding: 11px 14px; border: 1px solid var(--bdr); border-radius: var(--rs); font-size: 14px; font-family: 'DM Sans', sans-serif; color: var(--txt); background: var(--sfc); transition: border .15s; outline: none; }
+.fg input:focus, .fg select:focus { border-color: var(--b); background: #fff; }
+.fg input::placeholder { color: #9ca3af; }
+.fg .hint { font-size: 11px; color: var(--txs); margin-top: 4px; }
+.btn-submit { width: 100%; background: var(--bd); color: #fff; border: none; border-radius: var(--rs); padding: 13px; font-size: 15px; font-weight: 500; cursor: pointer; font-family: 'DM Sans', sans-serif; margin-top: .5rem; transition: all .18s; }
+.btn-submit:hover { background: var(--bm); }
+.btn-submit:disabled { opacity: .6; cursor: not-allowed; }
+.auth-switch { text-align: center; font-size: 13px; color: var(--txs); margin-top: 1.25rem; }
+.auth-switch a { color: var(--b); cursor: pointer; text-decoration: underline; font-weight: 500; }
+.auth-divider { display: flex; align-items: center; gap: 10px; margin: 1.25rem 0; color: var(--txs); font-size: 12px; }
+.auth-divider::before, .auth-divider::after { content: ''; flex: 1; height: 1px; background: var(--bdr); }
+.err-msg { font-size: 12px; color: #dc2626; margin-top: 6px; display: none; line-height: 1.5; }
+.err-msg.show { display: block; }
+
+/* PLAN SELECTOR */
+.plan-selector { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 1rem; }
+.plan-opt { border: 2px solid var(--bdr); border-radius: var(--rs); padding: 1rem; cursor: pointer; transition: all .18s; }
+.plan-opt:hover { border-color: var(--b); }
+.plan-opt.selected { border-color: var(--b); background: var(--bp); }
+.plan-opt-name { font-size: 13px; font-weight: 500; margin-bottom: 3px; }
+.plan-opt-price { font-family: 'Playfair Display', serif; font-size: 20px; color: var(--bd); }
+.plan-opt-period { font-size: 11px; color: var(--txs); }
+.plan-opt-save { font-size: 11px; color: #166534; font-weight: 500; }
+
+/* STUDENT CARD */
+.card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+.student-card { background: linear-gradient(145deg, var(--bd) 0%, #1a3352 60%, #0f2240 100%); border-radius: 22px; padding: 2rem; color: #fff; box-shadow: var(--shl); }
+.sc-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem; }
+.sc-brand { font-family: 'Playfair Display', serif; font-size: 16px; color: #93c5fd; }
+.sc-badge { background: rgba(147,197,253,.15); border: 1px solid rgba(147,197,253,.3); border-radius: 20px; padding: 3px 10px; font-size: 10px; color: #93c5fd; letter-spacing: 1px; text-transform: uppercase; }
+.sc-uni { font-size: 11px; opacity: .5; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px; }
+.sc-name { font-family: 'Playfair Display', serif; font-size: 24px; font-weight: 500; margin-bottom: 2px; }
+.sc-phone { font-size: 12px; opacity: .5; margin-bottom: 1.5rem; }
+.sc-qr { background: #fff; border-radius: 12px; padding: 14px; display: inline-block; margin-bottom: 1.5rem; }
+.sc-bottom { display: flex; justify-content: space-between; align-items: flex-end; }
+.sc-pts-lbl { font-size: 10px; opacity: .45; letter-spacing: 1.5px; text-transform: uppercase; }
+.sc-pts-num { font-family: 'Playfair Display', serif; font-size: 28px; }
+.sc-tier { background: rgba(147,197,253,.15); border: 1px solid rgba(147,197,253,.3); border-radius: 20px; padding: 4px 12px; font-size: 12px; color: #93c5fd; }
+.sc-plan { background: rgba(255,255,255,.08); border-radius: 20px; padding: 3px 10px; font-size: 11px; color: rgba(255,255,255,.6); margin-top: 6px; display: inline-block; }
+
+/* PANELS */
+.card-panels { display: flex; flex-direction: column; gap: 12px; }
+.panel { background: var(--w); border: 1px solid var(--bdr); border-radius: var(--r); padding: 1.25rem; }
+.panel-title { font-size: 11px; font-weight: 500; color: var(--txs); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; }
+.stamp-row { display: flex; gap: 7px; flex-wrap: wrap; }
+.stc { width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--bdr); display: flex; align-items: center; justify-content: center; font-size: 13px; color: #d1d5db; }
+.stc.earned { background: var(--bp); border-color: var(--b); color: var(--b); }
+
+/* DISCOUNTS */
+.discount-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.discount-card { border: 1px solid var(--bdr); border-radius: var(--rs); padding: 10px 12px; display: flex; align-items: center; gap: 10px; }
+.disc-icon { font-size: 20px; flex-shrink: 0; }
+.disc-name { font-size: 12px; font-weight: 500; }
+.disc-pct { font-size: 11px; color: var(--b); font-weight: 500; }
+.disc-code { font-size: 10px; color: var(--txs); background: var(--sfc); border-radius: 4px; padding: 2px 6px; margin-top: 3px; font-family: monospace; display: inline-block; }
+
+.act-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--bdr); font-size: 13px; }
+.act-row:last-child { border-bottom: none; }
+.act-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--b); flex-shrink: 0; }
+.act-time { margin-left: auto; font-size: 11px; color: var(--txs); }
+.switch-btn { width: 100%; background: none; border: 1px solid var(--bdr); border-radius: var(--rs); padding: 10px; font-size: 13px; color: var(--txs); cursor: pointer; font-family: 'DM Sans', sans-serif; margin-top: 4px; transition: all .18s; }
+.switch-btn:hover { border-color: var(--b); color: var(--b); }
+
+/* UTILS */
+.ptitle { font-family: 'Playfair Display', serif; font-size: 26px; font-weight: 500; margin-bottom: 4px; }
+.psub { font-size: 14px; color: var(--txs); margin-bottom: 1.5rem; }
+.loading { text-align: center; padding: 1.5rem; color: var(--txs); font-size: 13px; }
+.spin { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--bdr); border-top-color: var(--b); border-radius: 50%; animation: sp .7s linear infinite; margin-right: 6px; vertical-align: -2px; }
+@keyframes sp { to { transform: rotate(360deg); } }
+.toast { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--bd); color: #fff; padding: 12px 24px; border-radius: 30px; font-size: 14px; font-weight: 500; box-shadow: var(--shl); transition: transform .35s cubic-bezier(.34,1.56,.64,1); z-index: 999; white-space: nowrap; }
+.toast.show { transform: translateX(-50%) translateY(0); }
+.toast.err { background: #7f1d1d; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo" onclick="showPage('home')">
+    <div class="logo-mark">و</div>
+    <div>
+      <div class="logo-text">Wafa<span>Card</span></div>
+      <div class="logo-sub">Student</div>
+    </div>
+  </div>
+  <div class="ntabs">
+    <button class="ntab active" onclick="showPage('home')">Home</button>
+    <button class="ntab" onclick="showPage('enroll')" id="nav-enroll">Enroll</button>
+    <button class="ntab" onclick="showPage('mycard')" id="nav-mycard">My Card</button>
+    <button class="ntab" onclick="showPage('login')" id="nav-login">Sign In</button>
+    <div class="nav-user" id="nav-user" style="display:none">
+      <div class="nav-user-dot"></div>
+      <span id="nav-user-name">—</span>
+    </div>
+    <button class="btn-logout" id="nav-logout" onclick="doLogout()" style="display:none">Sign out</button>
+  </div>
+</nav>
+
+<!-- ═══ HOME ═══ -->
+<div id="page-home" class="page active">
+  <div class="hero">
+    <div class="hero-badge">🎓 For students in Damascus · للطلاب في دمشق</div>
+    <div class="hero-title">Your student life, <span>rewarded</span></div>
+    <div class="hero-sub">Discounts on food, electronics, clothing, pharmacies and more — plus a full loyalty card with stamps and rewards at partner restaurants.</div>
+    <div class="hero-cta">
+      <button class="btn-b" id="home-cta" onclick="showPage('enroll')">Get your student card →</button>
+      <button class="btn-o" onclick="showPage('home')" style="cursor:default">From 50,000 SYP/month</button>
+    </div>
+  </div>
+
+  <div class="stat-row">
+    <div class="stat-card"><div class="stat-num" id="h-students">—</div><div class="stat-lbl">Active students</div></div>
+    <div class="stat-card"><div class="stat-num" id="h-unis">3</div><div class="stat-lbl">Partner universities</div></div>
+    <div class="stat-card"><div class="stat-num">40+</div><div class="stat-lbl">Discount partners</div></div>
+  </div>
+
+  <div style="margin-bottom:1rem">
+    <div class="ptitle">What you get</div>
+    <div class="psub">Everything a student needs, in one card</div>
+  </div>
+  <div class="benefits-grid">
+    <div class="benefit-card"><div class="benefit-icon">🍔</div><h3>Food & cafes</h3><p>Discounts at partner restaurants and cafes near your campus. Plus stamp cards for free meals.</p></div>
+    <div class="benefit-card"><div class="benefit-icon">💻</div><h3>Electronics & tech</h3><p>Discounts on phone accessories, laptop repairs, and tech equipment.</p></div>
+    <div class="benefit-card"><div class="benefit-icon">👕</div><h3>Clothing</h3><p>Partner clothing stores and boutiques with exclusive student pricing.</p></div>
+    <div class="benefit-card"><div class="benefit-icon">💊</div><h3>Pharmacies</h3><p>Discounts on medicines and healthcare essentials at partner pharmacies.</p></div>
+    <div class="benefit-card"><div class="benefit-icon">🏋️</div><h3>Gyms & sports</h3><p>Reduced membership rates at partner gyms and sports centers.</p></div>
+    <div class="benefit-card"><div class="benefit-icon">📚</div><h3>Books & stationery</h3><p>University bookstores, printing shops, and stationery at student prices.</p></div>
+  </div>
+
+  <div style="margin-bottom:1rem;margin-top:.5rem">
+    <div class="ptitle">Choose your plan</div>
+    <div class="psub">Cancel anytime</div>
+  </div>
+  <div class="pricing-grid">
+    <div class="price-card">
+      <div class="price-name">Monthly</div>
+      <div class="price-amount">50,000 <span style="font-size:16px;color:var(--txs)">SYP</span></div>
+      <div class="price-period">per month</div>
+      <div class="price-features">
+        <div class="pf"><span class="pf-check">✓</span>All discounts unlocked</div>
+        <div class="pf"><span class="pf-check">✓</span>Full loyalty card</div>
+        <div class="pf"><span class="pf-check">✓</span>Stamps at restaurants</div>
+        <div class="pf"><span class="pf-check">✓</span>Points & tier system</div>
+        <div class="pf"><span class="pf-check">✓</span>Cancel anytime</div>
+      </div>
+    </div>
+    <div class="price-card featured">
+      <div class="price-badge">Best value — save 2 months</div>
+      <div class="price-name">Annual</div>
+      <div class="price-amount">500,000 <span style="font-size:16px;color:var(--txs)">SYP</span></div>
+      <div class="price-period">per year</div>
+      <div class="price-saving">You save 100,000 SYP</div>
+      <div class="price-features">
+        <div class="pf"><span class="pf-check">✓</span>Everything in monthly</div>
+        <div class="pf"><span class="pf-check">✓</span>Priority customer status</div>
+        <div class="pf"><span class="pf-check">✓</span>Birthday reward</div>
+        <div class="pf"><span class="pf-check">✓</span>Early access to deals</div>
+        <div class="pf"><span class="pf-check">✓</span>Silver tier instantly</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ENROLL ═══ -->
+<div id="page-enroll" class="page">
+  <div class="ptitle">Get your WafaCard Student</div>
+  <div class="psub">Choose how you want to enroll</div>
+
+  <div class="enroll-section">
+    <div class="enroll-title">How are you enrolling?</div>
+    <div class="enroll-sub">Select the method that matches how your university set up WafaCard Student, or sign up directly if you are enrolling independently.</div>
+
+    <div class="enroll-methods">
+      <div class="enroll-method" id="em-code" onclick="selectMethod('code')">
+        <div class="em-icon">🔑</div>
+        <div class="em-title">University code</div>
+        <div class="em-sub">Your university gave you an enrollment code in your welcome package</div>
+      </div>
+      <div class="enroll-method" id="em-qr" onclick="selectMethod('qr')">
+        <div class="em-icon">📱</div>
+        <div class="em-title">Scanned QR code</div>
+        <div class="em-sub">You scanned a QR code at your university registration desk</div>
+      </div>
+      <div class="enroll-method" id="em-direct" onclick="selectMethod('direct')">
+        <div class="em-icon">✍️</div>
+        <div class="em-title">Sign up directly</div>
+        <div class="em-sub">Enroll independently and pay your own subscription</div>
+      </div>
+    </div>
+
+    <!-- METHOD 1: University code -->
+    <div class="enroll-form" id="form-code">
+      <div style="background:var(--bp);border:1px solid var(--bl);border-radius:var(--rs);padding:1rem 1.25rem;margin-bottom:1.25rem;font-size:13px;color:var(--bd)">
+        🔑 Enter the enrollment code your university provided — it looks like <strong>UDAMASCUS2026</strong>
+      </div>
+      <div class="auth-wrap">
+        <div class="auth-box">
+          <div class="auth-title">University enrollment</div>
+          <div class="auth-sub">Enter your university code, student details, and create your account.</div>
+          <div class="fg">
+            <label>University enrollment code</label>
+            <input type="text" id="c-unicode" placeholder="e.g. UDAMASCUS2026" style="text-transform:uppercase">
+            <div class="hint">Provided by your university in your welcome package</div>
+          </div>
+          <div class="fg"><label>Student ID</label><input type="text" id="c-studid" placeholder="e.g. 2024/12345"></div>
+          <div class="fg"><label>Full name — الاسم الكامل</label><input type="text" id="c-name" placeholder="Ahmad Al-Khatib"></div>
+          <div class="fg"><label>Phone number — رقم الهاتف</label><input type="tel" id="c-phone" placeholder="0944 000 111"></div>
+          <div class="fg"><label>Age — العمر</label><input type="number" id="c-age" placeholder="20" min="16" max="35"></div>
+          <div class="fg"><label>Password — كلمة المرور</label><input type="password" id="c-pw" placeholder="At least 6 characters"></div>
+          <div class="fg"><label>Confirm password</label><input type="password" id="c-pw2" placeholder="Repeat your password"></div>
+          <div class="err-msg" id="c-err">—</div>
+          <button class="btn-submit" onclick="enrollWithCode()">Activate my student card →</button>
+          <div class="auth-switch">Already have an account? <a onclick="showPage('login')">Sign in</a></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- METHOD 2: QR code scanned -->
+    <div class="enroll-form" id="form-qr">
+      <div style="background:var(--bp);border:1px solid var(--bl);border-radius:var(--rs);padding:1rem 1.25rem;margin-bottom:1.25rem;font-size:13px;color:var(--bd)">
+        📱 You scanned the QR code at your registration desk — your university is already verified. Just fill in your details.
+      </div>
+      <div class="auth-wrap">
+        <div class="auth-box">
+          <div class="auth-title">Complete your enrollment</div>
+          <div class="auth-sub">Your university has been verified. Create your account to activate your card.</div>
+          <div class="fg">
+            <label>University</label>
+            <select id="q-uni">
+              <option value="">Select your university</option>
+              <option>University of Damascus · جامعة دمشق</option>
+              <option>Syrian Private University · الجامعة السورية الخاصة</option>
+              <option>Arab International University · الجامعة العربية الدولية</option>
+              <option>Higher Institute of Business Administration</option>
+            </select>
+          </div>
+          <div class="fg"><label>Student ID</label><input type="text" id="q-studid" placeholder="e.g. 2024/12345"></div>
+          <div class="fg"><label>Full name — الاسم الكامل</label><input type="text" id="q-name" placeholder="Ahmad Al-Khatib"></div>
+          <div class="fg"><label>Phone number — رقم الهاتف</label><input type="tel" id="q-phone" placeholder="0944 000 111"></div>
+          <div class="fg"><label>Age — العمر</label><input type="number" id="q-age" placeholder="20" min="16" max="35"></div>
+          <div class="fg">
+            <label>Subscription plan</label>
+            <div class="plan-selector">
+              <div class="plan-opt selected" id="q-monthly" onclick="selectPlan('q','monthly')">
+                <div class="plan-opt-name">Monthly</div>
+                <div class="plan-opt-price">50,000</div>
+                <div class="plan-opt-period">SYP / month</div>
+              </div>
+              <div class="plan-opt" id="q-annual" onclick="selectPlan('q','annual')">
+                <div class="plan-opt-name">Annual</div>
+                <div class="plan-opt-price">500,000</div>
+                <div class="plan-opt-period">SYP / year</div>
+                <div class="plan-opt-save">Save 100,000 SYP</div>
+              </div>
+            </div>
+          </div>
+          <div class="fg"><label>Password — كلمة المرور</label><input type="password" id="q-pw" placeholder="At least 6 characters"></div>
+          <div class="fg"><label>Confirm password</label><input type="password" id="q-pw2" placeholder="Repeat your password"></div>
+          <div class="err-msg" id="q-err">—</div>
+          <div style="background:var(--sfc);border:1px solid var(--bdr);border-radius:var(--rs);padding:10px 14px;font-size:12px;color:var(--txs);margin-bottom:1rem">
+            💳 Payment is collected manually. After signing up you will receive a WhatsApp message with payment instructions. Your card activates once payment is confirmed.
+          </div>
+          <button class="btn-submit" onclick="enrollQR()">Request my student card →</button>
+          <div class="auth-switch">Already have an account? <a onclick="showPage('login')">Sign in</a></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- METHOD 3: Direct signup -->
+    <div class="enroll-form" id="form-direct">
+      <div class="auth-wrap">
+        <div class="auth-box">
+          <div class="auth-title">Sign up directly</div>
+          <div class="auth-sub">Create your account and choose your plan. Payment is confirmed manually via WhatsApp.</div>
+          <div class="fg">
+            <label>University / School</label>
+            <select id="d-uni">
+              <option value="">Select your institution</option>
+              <option>University of Damascus · جامعة دمشق</option>
+              <option>Syrian Private University · الجامعة السورية الخاصة</option>
+              <option>Arab International University · الجامعة العربية الدولية</option>
+              <option>Higher Institute of Business Administration</option>
+              <option>Other university</option>
+              <option>High school</option>
+            </select>
+          </div>
+          <div class="fg"><label>Student ID</label><input type="text" id="d-studid" placeholder="e.g. 2024/12345"></div>
+          <div class="fg"><label>Full name — الاسم الكامل</label><input type="text" id="d-name" placeholder="Ahmad Al-Khatib"></div>
+          <div class="fg"><label>Phone number — رقم الهاتف</label><input type="tel" id="d-phone" placeholder="0944 000 111"></div>
+          <div class="fg"><label>Age — العمر</label><input type="number" id="d-age" placeholder="20" min="16" max="35"></div>
+          <div class="fg">
+            <label>Subscription plan</label>
+            <div class="plan-selector">
+              <div class="plan-opt selected" id="d-monthly" onclick="selectPlan('d','monthly')">
+                <div class="plan-opt-name">Monthly</div>
+                <div class="plan-opt-price">50,000</div>
+                <div class="plan-opt-period">SYP / month</div>
+              </div>
+              <div class="plan-opt" id="d-annual" onclick="selectPlan('d','annual')">
+                <div class="plan-opt-name">Annual</div>
+                <div class="plan-opt-price">500,000</div>
+                <div class="plan-opt-period">SYP / year</div>
+                <div class="plan-opt-save">Save 100,000 SYP</div>
+              </div>
+            </div>
+          </div>
+          <div class="fg"><label>Password — كلمة المرور</label><input type="password" id="d-pw" placeholder="At least 6 characters"></div>
+          <div class="fg"><label>Confirm password</label><input type="password" id="d-pw2" placeholder="Repeat your password"></div>
+          <div class="err-msg" id="d-err">—</div>
+          <div style="background:var(--sfc);border:1px solid var(--bdr);border-radius:var(--rs);padding:10px 14px;font-size:12px;color:var(--txs);margin-bottom:1rem">
+            💳 Payment is collected manually. After signing up you will receive a WhatsApp message with payment instructions. Your card activates once payment is confirmed.
+          </div>
+          <button class="btn-submit" onclick="enrollDirect()">Request my student card →</button>
+          <div class="auth-switch">Already have an account? <a onclick="showPage('login')">Sign in</a></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ LOGIN ═══ -->
+<div id="page-login" class="page">
+  <div style="display:flex;justify-content:center;padding-top:1rem">
+    <div class="auth-box">
+      <div class="auth-title">Welcome back</div>
+      <div class="auth-sub">Sign in to access your WafaCard Student.</div>
+      <div class="fg"><label>Phone number — رقم الهاتف</label><input type="tel" id="li-phone" placeholder="0944 000 111"></div>
+      <div class="fg"><label>Password — كلمة المرور</label><input type="password" id="li-pw" placeholder="••••••••"></div>
+      <div class="err-msg" id="li-err">—</div>
+      <button class="btn-submit" id="btn-login" onclick="doLogin()">Sign in →</button>
+      <div class="auth-divider">new student?</div>
+      <div class="auth-switch"><a onclick="showPage('enroll')">Enroll and get your card</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MY CARD ═══ -->
+<div id="page-mycard" class="page">
+  <div id="mc-loggedout" style="display:none;text-align:center;padding:3rem">
+    <div style="font-size:48px;margin-bottom:1rem">🎓</div>
+    <div style="font-family:'Playfair Display',serif;font-size:22px;margin-bottom:8px">Sign in to view your card</div>
+    <div style="font-size:14px;color:var(--txs);margin-bottom:1.5rem">Enter your phone number and password</div>
+    <button class="btn-b" onclick="showPage('login')">Sign in →</button>
+    <div style="margin-top:1rem;font-size:13px;color:var(--txs)">Don't have a card? <a onclick="showPage('enroll')" style="color:var(--b);cursor:pointer;text-decoration:underline">Enroll now</a></div>
+  </div>
+
+  <!-- Pending activation notice -->
+  <div id="mc-pending" style="display:none;text-align:center;padding:3rem">
+    <div style="font-size:48px;margin-bottom:1rem">⏳</div>
+    <div style="font-family:'Playfair Display',serif;font-size:22px;margin-bottom:8px">Awaiting activation</div>
+    <div style="font-size:14px;color:var(--txs);margin-bottom:1rem;max-width:360px;margin-left:auto;margin-right:auto;line-height:1.6">Your enrollment request has been received. We will contact you on WhatsApp with payment instructions. Your card will be activated within 24 hours.</div>
+    <div style="background:var(--bp);border:1px solid var(--bl);border-radius:var(--rs);padding:1rem;font-size:13px;color:var(--bd);max-width:360px;margin:0 auto">📱 Make sure your WhatsApp is active on <strong id="pending-phone">—</strong></div>
+  </div>
+
+  <div id="mc-loading" class="loading" style="display:none"><span class="spin"></span>Loading your card...</div>
+
+  <div id="mc-content" style="display:none">
+    <div class="ptitle" id="card-greeting">Your Student Card</div>
+    <div class="psub">Show your QR at partner restaurants and shops to claim discounts and stamps</div>
+    <div class="card-grid">
+      <div>
+        <div class="student-card">
+          <div class="sc-top">
+            <div class="sc-brand">WafaCard</div>
+            <div class="sc-badge">Student</div>
+          </div>
+          <div class="sc-uni" id="sc-uni">University</div>
+          <div class="sc-name" id="sc-name">—</div>
+          <div class="sc-phone" id="sc-phone">—</div>
+          <div class="sc-qr"><div id="qrcode"></div></div>
+          <div class="sc-bottom">
+            <div>
+              <div class="sc-pts-lbl">Total Points</div>
+              <div class="sc-pts-num" id="sc-pts">0</div>
+            </div>
+            <div>
+              <div class="sc-tier" id="sc-tier">🥉 Bronze</div>
+              <div class="sc-plan" id="sc-plan">Monthly</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card-panels">
+        <div class="panel">
+          <div class="panel-title">Stamp progress — cafes & food</div>
+          <div class="stamp-row" id="stamp-display"></div>
+          <div style="font-size:12px;color:var(--txs);margin-top:8px" id="stamp-note"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-title">Your discounts</div>
+          <div class="discount-grid" id="discount-grid">
+            <div class="discount-card"><div class="disc-icon">🍔</div><div><div class="disc-name">Food & cafes</div><div class="disc-pct">15% off</div><div class="disc-code">WAFA-FOOD</div></div></div>
+            <div class="discount-card"><div class="disc-icon">💻</div><div><div class="disc-name">Electronics</div><div class="disc-pct">10% off</div><div class="disc-code">WAFA-TECH</div></div></div>
+            <div class="discount-card"><div class="disc-icon">👕</div><div><div class="disc-name">Clothing</div><div class="disc-pct">20% off</div><div class="disc-code">WAFA-STYLE</div></div></div>
+            <div class="discount-card"><div class="disc-icon">💊</div><div><div class="disc-name">Pharmacy</div><div class="disc-pct">10% off</div><div class="disc-code">WAFA-CARE</div></div></div>
+            <div class="discount-card"><div class="disc-icon">🏋️</div><div><div class="disc-name">Gym</div><div class="disc-pct">25% off</div><div class="disc-code">WAFA-FIT</div></div></div>
+            <div class="discount-card"><div class="disc-icon">📚</div><div><div class="disc-name">Books</div><div class="disc-pct">15% off</div><div class="disc-code">WAFA-BOOK</div></div></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-title">Recent activity</div>
+          <div id="activity-list"><div class="loading">No activity yet</div></div>
+          <button class="switch-btn" onclick="doLogout()">↩ Sign out / switch account</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let selectedMethod  = null;
+let selectedPlans   = { q: 'monthly', d: 'monthly' };
+
+// ── NAVIGATION ──
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.ntab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  const map  = ['home','enroll','mycard','login'];
+  const idx  = map.indexOf(id);
+  if (idx >= 0) document.querySelectorAll('.ntab')[idx]?.classList.add('active');
+  if (id === 'mycard') initMyCard();
+  if (id === 'home')   loadHomeStats();
+  window.scrollTo(0, 0);
+}
+
+function updateNav(loggedIn) {
+  document.getElementById('nav-enroll').style.display  = loggedIn ? 'none'  : 'block';
+  document.getElementById('nav-login').style.display   = loggedIn ? 'none'  : 'block';
+  document.getElementById('nav-user').style.display    = loggedIn ? 'flex'  : 'none';
+  document.getElementById('nav-logout').style.display  = loggedIn ? 'block' : 'none';
+  if (loggedIn && window.curCardData) {
+    document.getElementById('nav-user-name').textContent = window.curCardData.name.split(' ')[0];
+    document.getElementById('home-cta').textContent = 'View my card →';
+    document.getElementById('home-cta').onclick = () => showPage('mycard');
+  } else {
+    document.getElementById('home-cta').textContent = 'Get your student card →';
+    document.getElementById('home-cta').onclick = () => showPage('enroll');
+  }
+}
+
+// ── ENROLLMENT METHOD ──
+function selectMethod(method) {
+  selectedMethod = method;
+  document.querySelectorAll('.enroll-method').forEach(m => m.classList.remove('selected'));
+  document.querySelectorAll('.enroll-form').forEach(f => f.classList.remove('show'));
+  document.getElementById('em-' + method).classList.add('selected');
+  document.getElementById('form-' + method).classList.add('show');
+}
+
+function selectPlan(prefix, plan) {
+  selectedPlans[prefix] = plan;
+  document.getElementById(prefix + '-monthly').classList.toggle('selected', plan === 'monthly');
+  document.getElementById(prefix + '-annual').classList.toggle('selected', plan === 'annual');
+}
+
+// ── PHONE → FIREBASE EMAIL ──
+function phoneToEmail(phone) {
+  return phone.replace(/\s+/g, '').replace(/[^0-9+]/g, '') + '@wafacard.sy';
+}
+
+// ── VALIDATE UNIVERSITY CODE ──
+async function validateUniCode(code) {
+  try {
+    const { collection, query, where, getDocs } = window.fbFns;
+    const q    = query(collection(window.db, 'universityCodes'), where('code', '==', code.toUpperCase()), where('active', '==', true));
+    const snap = await getDocs(q);
+    if (snap.empty) return null;
+    return { id: snap.docs[0].id, ...snap.docs[0].data() };
+  } catch(e) { return null; }
+}
+
+// ── CREATE STUDENT ACCOUNT ──
+async function createStudentAccount({ phone, name, age, university, studentId, plan, enrollMethod, activatedByCode }) {
+  const { createUserWithEmailAndPassword, collection, addDoc, serverTimestamp } = window.fbFns;
+  const email  = phoneToEmail(phone);
+  const cardId = 'WFCS-' + Math.floor(1000 + Math.random() * 9000);
+
+  const cred = await createUserWithEmailAndPassword(window.auth, email, '');
+  // Note: password set separately — trick: use phone+secret
+  await addDoc(collection(window.db, 'customers'), {
+    uid: cred.user.uid,
+    cardId, name, phone,
+    age: parseInt(age),
+    university: university || 'Unknown',
+    studentId: studentId || null,
+    isStudent: true,
+    plan: plan || 'monthly',
+    enrollMethod: enrollMethod || 'direct',
+    activated: activatedByCode || false, // true if university code, false = pending manual payment
+    points: 0, stamps: 0, tier: 'Bronze',
+    createdAt: serverTimestamp()
+  });
+  return { cardId, uid: cred.user.uid };
+}
+
+// ── ENROLL WITH UNIVERSITY CODE ──
+async function enrollWithCode() {
+  const code   = document.getElementById('c-unicode').value.trim();
+  const studId = document.getElementById('c-studid').value.trim();
+  const name   = document.getElementById('c-name').value.trim();
+  const phone  = document.getElementById('c-phone').value.trim();
+  const age    = document.getElementById('c-age').value;
+  const pw     = document.getElementById('c-pw').value;
+  const pw2    = document.getElementById('c-pw2').value;
+  const errEl  = document.getElementById('c-err');
+  errEl.classList.remove('show');
+
+  if (!code)         { showErr(errEl, 'Enter your university enrollment code'); return; }
+  if (!studId)       { showErr(errEl, 'Enter your student ID'); return; }
+  if (!name)         { showErr(errEl, 'Enter your full name'); return; }
+  if (!phone)        { showErr(errEl, 'Enter your phone number'); return; }
+  if (!age)          { showErr(errEl, 'Enter your age'); return; }
+  if (pw.length < 6) { showErr(errEl, 'Password must be at least 6 characters'); return; }
+  if (pw !== pw2)    { showErr(errEl, 'Passwords do not match'); return; }
+
+  const btn = document.querySelector('#form-code .btn-submit');
+  btn.disabled = true; btn.textContent = 'Verifying code...';
+
+  try {
+    // Validate university code
+    const uniData = await validateUniCode(code);
+    if (!uniData) { showErr(errEl, 'Invalid or expired enrollment code. Contact your university.'); btn.disabled=false; btn.textContent='Activate my student card →'; return; }
+
+    btn.textContent = 'Creating your card...';
+    const { createUserWithEmailAndPassword, collection, addDoc, serverTimestamp } = window.fbFns;
+    const email  = phoneToEmail(phone);
+    const cardId = 'WFCS-' + Math.floor(1000 + Math.random() * 9000);
+    const cred   = await createUserWithEmailAndPassword(window.auth, email, pw);
+    await addDoc(collection(window.db, 'customers'), {
+      uid: cred.user.uid, cardId, name, phone,
+      age: parseInt(age), university: uniData.universityName,
+      studentId: studId, isStudent: true,
+      plan: uniData.plan || 'annual',
+      enrollMethod: 'code', activated: true,
+      points: 0, stamps: 0, tier: 'Bronze',
+      createdAt: serverTimestamp()
+    });
+    toast('✓ Student card activated!');
+    setTimeout(() => showPage('mycard'), 1000);
+  } catch(e) {
+    let msg = e.message;
+    if (e.code === 'auth/email-already-in-use') msg = 'This phone number already has an account. Sign in instead.';
+    showErr(errEl, msg);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Activate my student card →';
+  }
+}
+
+// ── ENROLL VIA QR ──
+async function enrollQR() {
+  const uni    = document.getElementById('q-uni').value;
+  const studId = document.getElementById('q-studid').value.trim();
+  const name   = document.getElementById('q-name').value.trim();
+  const phone  = document.getElementById('q-phone').value.trim();
+  const age    = document.getElementById('q-age').value;
+  const pw     = document.getElementById('q-pw').value;
+  const pw2    = document.getElementById('q-pw2').value;
+  const plan   = selectedPlans['q'];
+  const errEl  = document.getElementById('q-err');
+  errEl.classList.remove('show');
+
+  if (!uni)          { showErr(errEl, 'Select your university'); return; }
+  if (!studId)       { showErr(errEl, 'Enter your student ID'); return; }
+  if (!name)         { showErr(errEl, 'Enter your full name'); return; }
+  if (!phone)        { showErr(errEl, 'Enter your phone number'); return; }
+  if (!age)          { showErr(errEl, 'Enter your age'); return; }
+  if (pw.length < 6) { showErr(errEl, 'Password must be at least 6 characters'); return; }
+  if (pw !== pw2)    { showErr(errEl, 'Passwords do not match'); return; }
+
+  await submitEnrollment('q', { uni, studId, name, phone, age, pw, plan, method: 'qr' });
+}
+
+// ── ENROLL DIRECT ──
+async function enrollDirect() {
+  const uni    = document.getElementById('d-uni').value;
+  const studId = document.getElementById('d-studid').value.trim();
+  const name   = document.getElementById('d-name').value.trim();
+  const phone  = document.getElementById('d-phone').value.trim();
+  const age    = document.getElementById('d-age').value;
+  const pw     = document.getElementById('d-pw').value;
+  const pw2    = document.getElementById('d-pw2').value;
+  const plan   = selectedPlans['d'];
+  const errEl  = document.getElementById('d-err');
+  errEl.classList.remove('show');
+
+  if (!uni)          { showErr(errEl, 'Select your university or school'); return; }
+  if (!name)         { showErr(errEl, 'Enter your full name'); return; }
+  if (!phone)        { showErr(errEl, 'Enter your phone number'); return; }
+  if (!age)          { showErr(errEl, 'Enter your age'); return; }
+  if (pw.length < 6) { showErr(errEl, 'Password must be at least 6 characters'); return; }
+  if (pw !== pw2)    { showErr(errEl, 'Passwords do not match'); return; }
+
+  await submitEnrollment('d', { uni, studId, name, phone, age, pw, plan, method: 'direct' });
+}
+
+async function submitEnrollment(prefix, { uni, studId, name, phone, age, pw, plan, method }) {
+  const errEl = document.getElementById(prefix + '-err');
+  const btn   = document.querySelector('#form-' + (prefix === 'q' ? 'qr' : 'direct') + ' .btn-submit');
+  btn.disabled = true; btn.textContent = 'Submitting...';
+  try {
+    const { createUserWithEmailAndPassword, collection, addDoc, serverTimestamp } = window.fbFns;
+    const email  = phoneToEmail(phone);
+    const cardId = 'WFCS-' + Math.floor(1000 + Math.random() * 9000);
+    const cred   = await createUserWithEmailAndPassword(window.auth, email, pw);
+    await addDoc(collection(window.db, 'customers'), {
+      uid: cred.user.uid, cardId, name, phone,
+      age: parseInt(age), university: uni,
+      studentId: studId || null, isStudent: true,
+      plan, enrollMethod: method,
+      activated: false, // pending payment confirmation
+      points: 0, stamps: 0, tier: 'Bronze',
+      createdAt: serverTimestamp()
+    });
+    toast('✓ Request submitted! Check WhatsApp for payment details.');
+    setTimeout(() => showPage('mycard'), 1000);
+  } catch(e) {
+    let msg = e.message;
+    if (e.code === 'auth/email-already-in-use') msg = 'This phone number already has an account. Sign in instead.';
+    showErr(errEl, msg);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Request my student card →';
+  }
+}
+
+// ── LOGIN ──
+async function doLogin() {
+  const phone = document.getElementById('li-phone').value.trim();
+  const pw    = document.getElementById('li-pw').value;
+  const errEl = document.getElementById('li-err');
+  errEl.classList.remove('show');
+  if (!phone) { showErr(errEl, 'Enter your phone number'); return; }
+  if (!pw)    { showErr(errEl, 'Enter your password'); return; }
+  const btn = document.getElementById('btn-login');
+  btn.disabled = true; btn.textContent = 'Signing in...';
+  try {
+    const email = phoneToEmail(phone);
+    await window.fbFns.signInWithEmailAndPassword(window.auth, email, pw);
+    toast('✓ Welcome back!');
+    setTimeout(() => showPage('mycard'), 800);
+  } catch(e) {
+    let msg = 'Incorrect phone number or password.';
+    if (e.code === 'auth/user-not-found')    msg = 'No account found. Enroll first.';
+    if (e.code === 'auth/wrong-password')    msg = 'Incorrect password.';
+    if (e.code === 'auth/too-many-requests') msg = 'Too many attempts. Try again later.';
+    showErr(errEl, msg);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Sign in →';
+  }
+}
+
+// ── LOGOUT ──
+async function doLogout() {
+  await window.fbFns.signOut(window.auth);
+  window.curDocId = null; window.curCardData = null;
+  updateNav(false);
+  showPage('home');
+  toast('Signed out');
+}
+
+// ── MY CARD ──
+function initMyCard() {
+  document.getElementById('mc-loading').style.display   = 'none';
+  document.getElementById('mc-content').style.display   = 'none';
+  document.getElementById('mc-loggedout').style.display = 'none';
+  document.getElementById('mc-pending').style.display   = 'none';
+
+  if (!window.currentUser) {
+    document.getElementById('mc-loggedout').style.display = 'block';
+    return;
+  }
+  if (window.curCardData) {
+    // Check if pending activation
+    if (!window.curCardData.activated) {
+      document.getElementById('mc-pending').style.display = 'block';
+      document.getElementById('pending-phone').textContent = window.curCardData.phone || '—';
+      return;
+    }
+    renderCard(window.curCardData);
+    loadActivity();
+    return;
+  }
+  document.getElementById('mc-loading').style.display = 'block';
+}
+
+function renderCard(d) {
+  document.getElementById('mc-loading').style.display   = 'none';
+  document.getElementById('mc-content').style.display   = 'block';
+  const cardId = d.cardId || 'WFCS-0000';
+  document.getElementById('card-greeting').textContent  = d.name.split(' ')[0] + "'s Student Card";
+  document.getElementById('sc-uni').textContent   = d.university || 'University';
+  document.getElementById('sc-name').textContent  = d.name;
+  document.getElementById('sc-phone').textContent = d.phone;
+  document.getElementById('sc-pts').textContent   = d.points || 0;
+  document.getElementById('sc-tier').textContent  = getTier(d.points).lbl;
+  document.getElementById('sc-plan').textContent  = (d.plan === 'annual' ? '📅 Annual plan' : '📆 Monthly plan');
+  const qrEl = document.getElementById('qrcode');
+  qrEl.innerHTML = '';
+  new QRCode(qrEl, {
+    text: 'wafacard-student:' + cardId + ':' + window.curDocId,
+    width: 100, height: 100,
+    colorDark: '#1e3a5f', colorLight: '#ffffff',
+    correctLevel: QRCode.CorrectLevel.M
+  });
+  const stamps = d.stamps || 0;
+  const el = document.getElementById('stamp-display');
+  el.innerHTML = '';
+  for (let i = 1; i <= 9; i++) {
+    const s = document.createElement('div');
+    s.className = 'stc' + (i <= stamps ? ' earned' : '');
+    s.textContent = i <= stamps ? '✓' : i;
+    el.appendChild(s);
+  }
+  document.getElementById('stamp-note').textContent = stamps >= 9
+    ? '🎉 Free meal unlocked!'
+    : stamps + ' of 9 — ' + (9 - stamps) + ' more for a free meal!';
+  updateNav(true);
+}
+
+async function loadActivity() {
+  try {
+    const { collection, query, where, orderBy, limit, getDocs } = window.fbFns;
+    const q    = query(collection(window.db,'activity'), where('customerId','==',window.curDocId), orderBy('timestamp','desc'), limit(4));
+    const snap = await getDocs(q);
+    const el   = document.getElementById('activity-list');
+    if (snap.empty) { el.innerHTML = '<div style="font-size:13px;color:var(--txs);padding:4px 0">No activity yet</div>'; return; }
+    el.innerHTML = '';
+    snap.forEach(d => {
+      const data = d.data();
+      const time = data.timestamp ? new Date(data.timestamp.seconds*1000).toLocaleDateString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '—';
+      el.innerHTML += `<div class="act-row"><div class="act-dot"></div><div>${data.restaurant} — stamp added</div><div class="act-time">${time}</div></div>`;
+    });
+  } catch(e) { console.error(e); }
+}
+
+function getTier(pts) {
+  if ((pts||0) >= 1000) return { lbl: '🥇 Gold' };
+  if ((pts||0) >= 500)  return { lbl: '🥈 Silver' };
+  return                       { lbl: '🥉 Bronze' };
+}
+
+async function loadHomeStats() {
+  try {
+    const { collection, query, where, getDocs } = window.fbFns;
+    const q    = query(collection(window.db, 'customers'), where('isStudent', '==', true));
+    const snap = await getDocs(q);
+    document.getElementById('h-students').textContent = snap.size;
+  } catch(e) {}
+}
+
+function showErr(el, msg) { el.textContent = msg; el.classList.add('show'); }
+function toast(msg, isErr=false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast' + (isErr ? ' err' : '');
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// Auto-select method from URL param (for QR code scanning)
+window.addEventListener('load', () => {
+  const params = new URLSearchParams(window.location.search);
+  const method = params.get('method');
+  const uni    = params.get('uni');
+  if (method) {
+    showPage('enroll');
+    selectMethod(method);
+    if (uni && document.getElementById('q-uni')) {
+      // Pre-fill university from QR code
+      const sel = document.getElementById('q-uni');
+      for (let opt of sel.options) {
+        if (opt.value.toLowerCase().includes(uni.toLowerCase())) {
+          sel.value = opt.value; break;
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
