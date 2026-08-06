@@ -6,6 +6,7 @@
 <title>WafaCard — Restaurant Portal</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getFirestore, collection, addDoc, doc, getDoc, updateDoc, query, where, orderBy, limit, getDocs, serverTimestamp }
@@ -239,10 +240,22 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
     <div class="portal-grid">
       <div class="scan-card">
         <h2>Scan customer card</h2>
-        <div class="scan-area" onclick="simulateScan()">
-          <div class="scan-icon">📷</div>
-          <div class="scan-txt">Tap to open camera scanner</div>
-          <div class="scan-sub">Point at customer's WafaCard QR code</div>
+
+        <!-- Camera scanner -->
+        <div id="scanner-container" style="margin-bottom:1.25rem">
+          <!-- Idle state — tap to start -->
+          <div class="scan-area" id="scan-idle" onclick="startScanner()">
+            <div class="scan-icon">📷</div>
+            <div class="scan-txt">Tap to open camera scanner</div>
+            <div class="scan-sub">Point at customer's WafaCard QR code</div>
+          </div>
+          <!-- Active scanner -->
+          <div id="scan-active" style="display:none">
+            <div id="qr-reader" style="width:100%;border-radius:var(--r);overflow:hidden"></div>
+            <button onclick="stopScanner()" style="width:100%;margin-top:10px;background:var(--redl);color:var(--red);border:1px solid #fecaca;border-radius:var(--rs);padding:10px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
+              ✕ Stop camera
+            </button>
+          </div>
         </div>
         <div class="divider-txt">— or enter card ID manually —</div>
         <div class="input-row">
@@ -376,11 +389,56 @@ function showTab(id, el) {
   if (id === 'analytics') loadAnalytics();
 }
 
-// ── SCANNER ──
-function simulateScan() {
-  const stored = localStorage.getItem('wfc_cardid');
-  if (stored) { document.getElementById('manual-id').value = stored; lookupCustomer(); }
-  else toast('Enter a card ID to test', true);
+// ── CAMERA SCANNER ──
+let html5QrCode = null;
+
+async function startScanner() {
+  document.getElementById('scan-idle').style.display   = 'none';
+  document.getElementById('scan-active').style.display = 'block';
+
+  html5QrCode = new Html5Qrcode('qr-reader');
+
+  try {
+    await html5QrCode.start(
+      { facingMode: 'environment' }, // use back camera
+      { fps: 10, qrbox: { width: 250, height: 250 } },
+      (decodedText) => {
+        // QR code detected — parse card ID
+        handleQRScan(decodedText);
+      },
+      () => {} // ignore scan errors (frequent when no QR in view)
+    );
+  } catch(e) {
+    stopScanner();
+    // Camera permission denied or not available
+    toast('Camera not available. Use manual entry below.', true);
+  }
+}
+
+async function stopScanner() {
+  if (html5QrCode) {
+    try {
+      await html5QrCode.stop();
+      html5QrCode.clear();
+    } catch(e) {}
+    html5QrCode = null;
+  }
+  document.getElementById('scan-idle').style.display   = 'block';
+  document.getElementById('scan-active').style.display = 'none';
+}
+
+function handleQRScan(text) {
+  // QR format: wafacard:WFC-1234:docId or wafacard-student:WFCS-1234:docId
+  stopScanner();
+  const parts  = text.split(':');
+  const cardId = parts[1] || null;
+  if (cardId && (cardId.startsWith('WFC-') || cardId.startsWith('WFCS-'))) {
+    document.getElementById('manual-id').value = cardId;
+    lookupCustomer();
+    toast('✓ QR code scanned: ' + cardId);
+  } else {
+    toast('Invalid QR code. Try manual entry.', true);
+  }
 }
 
 async function lookupCustomer() {
