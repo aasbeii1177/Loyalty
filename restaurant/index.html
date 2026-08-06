@@ -5,9 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>WafaCard — Restaurant Portal</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, addDoc, doc, updateDoc, query, where, orderBy, limit, getDocs, serverTimestamp }
+  import { getFirestore, collection, addDoc, doc, getDoc, updateDoc, query, where, orderBy, limit, getDocs, serverTimestamp }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
@@ -24,28 +25,29 @@
   const app  = initializeApp(cfg);
   const db   = getFirestore(app);
   const auth = getAuth(app);
-  window.db  = db;
-  window.auth = auth;
-  window.fbFns = { collection, addDoc, doc, updateDoc, query, where, orderBy, limit, getDocs, serverTimestamp, signInWithEmailAndPassword, signOut };
+  window.db  = db; window.auth = auth;
+  window.fbFns = {
+    collection, addDoc, doc, getDoc, updateDoc, query, where, orderBy, limit, getDocs,
+    serverTimestamp, signInWithEmailAndPassword, signOut
+  };
 
   onAuthStateChanged(auth, async (user) => {
     window.currentUser = user;
     if (user) {
       try {
         const { collection, query, where, getDocs } = window.fbFns;
-        const q    = query(collection(db, 'restaurants'), where('uid', '==', user.uid));
+        const q    = query(collection(db,'restaurants'), where('uid','==',user.uid));
         const snap = await getDocs(q);
         if (!snap.empty) {
           const data = snap.docs[0].data();
-          // Check if disabled
           if (data.disabled) {
             await signOut(auth);
             showLogin();
-            showErr(document.getElementById('li-err'), 'Your account has been disabled. Please contact WafaCard support.');
+            showErr(document.getElementById('li-err'), 'Your account has been disabled. Contact WafaCard support.');
             return;
           }
-          window.restaurantName   = data.name;
-          window.restaurantDocId  = snap.docs[0].id;
+          window.restaurantName  = data.name;
+          window.restaurantDocId = snap.docs[0].id;
           document.getElementById('r-name').textContent = data.name;
           document.getElementById('r-meta').textContent = 'Damascus · WafaCard Partner';
         }
@@ -63,7 +65,7 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'DM Sans',sans-serif;background:#f3f4f6;color:var(--txt);min-height:100vh}
 nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-content:space-between;height:64px;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,.2)}
-.logo{display:flex;align-items:center;gap:10px;text-decoration:none;cursor:pointer}
+.logo{display:flex;align-items:center;gap:10px;cursor:pointer}
 .logo-mark{width:34px;height:34px;background:var(--g);border-radius:9px;display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:17px;color:#fff;font-weight:600}
 .logo-text{font-family:'Playfair Display',serif;font-size:19px;color:#fff;letter-spacing:-.3px}
 .logo-text span{color:#6ee7b7}
@@ -86,48 +88,72 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
 .btn-main{width:100%;background:var(--gd);color:#fff;border:none;border-radius:var(--rs);padding:13px;font-size:15px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:.5rem;transition:all .18s}
 .btn-main:hover{background:var(--gm)}
 .btn-main:disabled{opacity:.6;cursor:not-allowed}
-.login-note{text-align:center;font-size:12px;color:var(--txs);margin-top:1.25rem;line-height:1.5}
 .err-msg{font-size:12px;color:#dc2626;margin-top:6px;display:none;line-height:1.5}
 .err-msg.show{display:block}
+.login-note{text-align:center;font-size:12px;color:var(--txs);margin-top:1.25rem;line-height:1.5}
 
 /* PORTAL */
-#portal-view{display:none;padding:2rem;max-width:1000px;margin:0 auto}
+#portal-view{display:none;padding:2rem;max-width:1050px;margin:0 auto}
 .portal-header{background:var(--w);border:1px solid var(--bdr);border-radius:var(--r);padding:1.25rem 1.75rem;display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;box-shadow:var(--sh)}
 .phn{font-family:'Playfair Display',serif;font-size:22px}
 .phm{font-size:12px;color:var(--txs);margin-top:2px}
 .status{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--g);font-weight:500}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--g);animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* TABS */
+.portal-tabs{display:flex;gap:4px;background:var(--w);border:1px solid var(--bdr);border-radius:var(--r);padding:5px;margin-bottom:1.5rem;box-shadow:var(--sh)}
+.ptab{flex:1;padding:9px;border-radius:var(--rs);font-size:13px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--txs);transition:all .18s;font-family:'DM Sans',sans-serif}
+.ptab:hover{color:var(--txt);background:var(--sfc)}
+.ptab.active{background:var(--gd);color:#fff}
+.tab-section{display:none}
+.tab-section.active{display:block;animation:fu .25s ease}
+@keyframes fu{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* SCANNER */
 .portal-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}
 .scan-card{background:var(--w);border:1px solid var(--bdr);border-radius:var(--r);padding:1.75rem;box-shadow:var(--sh)}
 .scan-card h2{font-size:16px;font-weight:500;margin-bottom:1.25rem}
-.scan-area{background:var(--sfc);border:2px dashed var(--bdr);border-radius:var(--r);padding:2.75rem 1rem;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:1.25rem}
+.scan-area{background:var(--sfc);border:2px dashed var(--bdr);border-radius:var(--r);padding:2.5rem 1rem;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:1.25rem}
 .scan-area:hover{border-color:var(--g);background:var(--gp)}
-.scan-icon{font-size:52px;margin-bottom:10px}
+.scan-icon{font-size:48px;margin-bottom:10px}
 .scan-txt{font-size:14px;font-weight:500;color:var(--txm);margin-bottom:4px}
 .scan-sub{font-size:12px;color:var(--txs)}
 .divider-txt{text-align:center;font-size:12px;color:var(--txs);margin-bottom:10px}
-.input-row{display:flex;gap:8px}
+.input-row{display:flex;gap:8px;margin-bottom:10px}
 .input-row input{flex:1;padding:11px 14px;border:1px solid var(--bdr);border-radius:var(--rs);font-size:14px;font-family:'DM Sans',sans-serif;outline:none}
 .input-row input:focus{border-color:var(--g)}
 .btn-lookup{background:var(--g);color:#fff;border:none;border-radius:var(--rs);padding:11px 20px;font-size:14px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .18s;white-space:nowrap}
 .btn-lookup:hover{background:#047857}
-.cust-result{display:none;background:var(--gp);border:1px solid var(--gl);border-radius:var(--r);padding:1.5rem;margin-top:1.25rem}
+
+/* CUSTOMER RESULT */
+.cust-result{display:none;background:var(--gp);border:1px solid var(--gl);border-radius:var(--r);padding:1.5rem;margin-top:1rem}
 .cust-result.show{display:block;animation:fu .3s ease}
-@keyframes fu{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 .cr-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem}
 .cr-name{font-size:17px;font-weight:500;color:var(--gd)}
 .cr-sub{font-size:12px;color:var(--txs);margin-top:2px}
-.cr-pts{font-family:'Playfair Display',serif;font-size:24px;color:var(--gd)}
-.cr-stamps-lbl{font-size:11px;color:var(--txs);margin-bottom:8px;letter-spacing:.3px;text-transform:uppercase}
-.cr-stamps{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1.25rem}
-.cr-stamp{width:32px;height:32px;border-radius:50%;border:1.5px solid var(--gl);background:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;color:#d1d5db}
-.cr-stamp.done{background:var(--g);border-color:var(--g);color:#fff;font-size:12px}
+.cr-pts{font-family:'Playfair Display',serif;font-size:22px;color:var(--gd)}
+.cr-stamps-lbl{font-size:11px;color:var(--txs);margin-bottom:6px;text-transform:uppercase;letter-spacing:.3px}
+.cr-stamps{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:1rem}
+.cr-stamp{width:30px;height:30px;border-radius:50%;border:1.5px solid var(--gl);background:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;color:#d1d5db}
+.cr-stamp.done{background:var(--g);border-color:var(--g);color:#fff}
+
+/* BILL INPUT */
+.bill-section{background:#fff;border:1px solid var(--bdr);border-radius:var(--rs);padding:1rem;margin-bottom:1rem}
+.bill-label{font-size:12px;font-weight:500;color:var(--txm);margin-bottom:6px;display:block}
+.bill-row{display:flex;gap:8px;align-items:center}
+.bill-input{flex:1;padding:10px 14px;border:1px solid var(--bdr);border-radius:var(--rs);font-size:15px;font-weight:500;font-family:'DM Sans',sans-serif;outline:none}
+.bill-input:focus{border-color:var(--g)}
+.bill-currency{font-size:13px;color:var(--txs);white-space:nowrap}
+.bill-pts{font-size:12px;color:var(--g);margin-top:5px;font-weight:500;min-height:16px}
+
 .btn-stamp{width:100%;background:var(--gd);color:#fff;border:none;border-radius:var(--rs);padding:13px;font-size:15px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .18s}
 .btn-stamp:hover{background:var(--gm)}
 .btn-stamp:disabled{opacity:.5;cursor:not-allowed}
-.stamp-done{display:none;background:var(--gd);color:#fff;border-radius:var(--rs);padding:1rem 1.25rem;margin-top:10px;text-align:center;font-size:14px;font-weight:500}
+.stamp-done{display:none;background:var(--gd);color:#fff;border-radius:var(--rs);padding:1rem;margin-top:10px;text-align:center;font-size:14px;font-weight:500}
 .stamp-done.show{display:block;animation:fu .3s ease}
+
+/* SIDE STATS */
 .side-panel{display:flex;flex-direction:column;gap:12px}
 .mini-stat{background:var(--w);border:1px solid var(--bdr);border-radius:var(--r);padding:1.1rem 1.25rem;display:flex;justify-content:space-between;align-items:center}
 .ms-lbl{font-size:13px;color:var(--txs)}
@@ -139,9 +165,28 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
 .scan-avatar{width:32px;height:32px;border-radius:50%;background:var(--gp);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;color:var(--gd);flex-shrink:0}
 .scan-name{font-weight:500}
 .scan-time{margin-left:auto;font-size:11px;color:var(--txs)}
+.scan-bill{font-size:11px;color:var(--g);font-weight:500}
+
+/* ANALYTICS */
+.analytics-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:10px}
+.analytics-title{font-family:'Playfair Display',serif;font-size:20px;font-weight:500}
+.analytics-sub{font-size:13px;color:var(--txs);margin-top:2px}
+.btn-export{background:var(--gd);color:#fff;border:none;border-radius:var(--rs);padding:9px 18px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .18s;display:flex;align-items:center;gap:6px}
+.btn-export:hover{background:var(--gm)}
+.search-input{padding:8px 12px;border:1px solid var(--bdr);border-radius:var(--rs);font-size:13px;font-family:'DM Sans',sans-serif;outline:none;width:220px}
+.search-input:focus{border-color:var(--g)}
+.table-card{background:var(--w);border:1px solid var(--bdr);border-radius:var(--r);overflow:hidden;box-shadow:var(--sh)}
+.thead{display:grid;padding:10px 16px;background:var(--sfc);border-bottom:1px solid var(--bdr);font-size:11px;font-weight:500;color:var(--txs);text-transform:uppercase;letter-spacing:.5px}
+.trow{display:grid;padding:13px 16px;border-bottom:1px solid var(--bdr);font-size:13px;align-items:center;transition:background .12s}
+.trow:last-child{border-bottom:none}
+.trow:hover{background:var(--sfc)}
+.tname{font-weight:500}
+.birthday-soon{background:#fef3c7;color:#92400e;border-radius:20px;padding:2px 8px;font-size:11px;font-weight:500;margin-left:6px}
+
 .loading{text-align:center;padding:1.5rem;color:var(--txs);font-size:13px}
 .spin{display:inline-block;width:16px;height:16px;border:2px solid var(--bdr);border-top-color:var(--g);border-radius:50%;animation:sp .7s linear infinite;margin-right:6px;vertical-align:-2px}
 @keyframes sp{to{transform:rotate(360deg)}}
+.empty{padding:2rem;text-align:center;font-size:13px;color:var(--txs)}
 .toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%) translateY(80px);background:var(--gd);color:#fff;padding:12px 24px;border-radius:30px;font-size:14px;font-weight:500;box-shadow:var(--shl);transition:transform .35s cubic-bezier(.34,1.56,.64,1);z-index:999;white-space:nowrap}
 .toast.show{transform:translateX(-50%) translateY(0)}
 .toast.err{background:#7f1d1d}
@@ -150,7 +195,7 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
 <body>
 
 <nav>
-  <div class="logo" onclick="window.location.href='index.html'">
+  <div class="logo" onclick="window.location.href='../index.html'">
     <div class="logo-mark">و</div>
     <div class="logo-text">Wafa<span>Card</span></div>
   </div>
@@ -160,26 +205,17 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
   </div>
 </nav>
 
-<!-- LOGIN — only option, no register -->
+<!-- LOGIN -->
 <div id="login-view">
   <div class="login-box">
     <div class="login-icon">🥙</div>
     <div class="login-title">Restaurant Login</div>
     <div class="login-sub">Sign in with the credentials provided by WafaCard to access your partner portal.</div>
-    <div class="fg">
-      <label>Email address</label>
-      <input type="email" id="li-email" placeholder="your@restaurant.com">
-    </div>
-    <div class="fg">
-      <label>Password</label>
-      <input type="password" id="li-pw" placeholder="••••••••">
-    </div>
+    <div class="fg"><label>Email address</label><input type="email" id="li-email" placeholder="your@restaurant.com"></div>
+    <div class="fg"><label>Password</label><input type="password" id="li-pw" placeholder="••••••••"></div>
     <div class="err-msg" id="li-err">—</div>
     <button class="btn-main" id="btn-login" onclick="doLogin()">Sign in</button>
-    <div class="login-note">
-      Don't have an account?<br>
-      Contact WafaCard to become a partner: <strong>info@wafacard.sy</strong>
-    </div>
+    <div class="login-note">Don't have an account?<br>Contact WafaCard: <strong>info@wafacard.sy</strong></div>
   </div>
 </div>
 
@@ -193,42 +229,102 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
     <div class="status"><div class="dot"></div>Portal active</div>
   </div>
 
-  <div class="portal-grid">
-    <div class="scan-card">
-      <h2>Scan customer card</h2>
-      <div class="scan-area" onclick="simulateScan()">
-        <div class="scan-icon">📷</div>
-        <div class="scan-txt">Tap to open camera scanner</div>
-        <div class="scan-sub">Point camera at customer's WafaCard QR code</div>
-      </div>
-      <div class="divider-txt">— or type customer card ID manually —</div>
-      <div class="input-row">
-        <input type="text" id="manual-id" placeholder="e.g. WFC-4821">
-        <button class="btn-lookup" onclick="lookupCustomer()">Look up</button>
+  <div class="portal-tabs">
+    <button class="ptab active" onclick="showTab('scanner',this)">📷 Scanner</button>
+    <button class="ptab" onclick="showTab('analytics',this)">📊 Customer Analytics</button>
+  </div>
+
+  <!-- ═══ SCANNER TAB ═══ -->
+  <div id="tab-scanner" class="tab-section active">
+    <div class="portal-grid">
+      <div class="scan-card">
+        <h2>Scan customer card</h2>
+        <div class="scan-area" onclick="simulateScan()">
+          <div class="scan-icon">📷</div>
+          <div class="scan-txt">Tap to open camera scanner</div>
+          <div class="scan-sub">Point at customer's WafaCard QR code</div>
+        </div>
+        <div class="divider-txt">— or enter card ID manually —</div>
+        <div class="input-row">
+          <input type="text" id="manual-id" placeholder="e.g. WFC-4821">
+          <button class="btn-lookup" onclick="lookupCustomer()">Look up</button>
+        </div>
+
+        <div class="cust-result" id="cust-result">
+          <div class="cr-top">
+            <div>
+              <div class="cr-name" id="cr-name">—</div>
+              <div class="cr-sub" id="cr-sub">—</div>
+            </div>
+            <div class="cr-pts" id="cr-pts">0 pts</div>
+          </div>
+          <div class="cr-stamps-lbl">Stamp progress at <span id="cr-rest-name">your restaurant</span></div>
+          <div class="cr-stamps" id="cr-stamps"></div>
+
+          <!-- Bill amount -->
+          <div class="bill-section">
+            <label class="bill-label">Enter bill amount — أدخل قيمة الفاتورة</label>
+            <div class="bill-row">
+              <input type="number" class="bill-input" id="bill-amount" placeholder="0" min="0" oninput="updatePointsPreview()">
+              <span class="bill-currency">SYP</span>
+            </div>
+            <div class="bill-pts" id="bill-pts-preview"></div>
+          </div>
+
+          <button class="btn-stamp" id="btn-stamp" onclick="addStamp()">✓ Add stamp for this visit</button>
+          <div class="stamp-done" id="stamp-done">✓ Stamp saved!</div>
+        </div>
       </div>
 
-      <div class="cust-result" id="cust-result">
-        <div class="cr-top">
-          <div>
-            <div class="cr-name" id="cr-name">—</div>
-            <div class="cr-sub" id="cr-sub">—</div>
-          </div>
-          <div class="cr-pts" id="cr-pts">0 pts</div>
+      <div class="side-panel">
+        <div class="mini-stat"><div class="ms-lbl">Scans today</div><div class="ms-val" id="stat-today">—</div></div>
+        <div class="mini-stat"><div class="ms-lbl">Total scans</div><div class="ms-val" id="stat-total">—</div></div>
+        <div class="recent-card">
+          <div class="recent-title">Recent scans</div>
+          <div id="recent-list"><div class="loading"><span class="spin"></span>Loading...</div></div>
         </div>
-        <div class="cr-stamps-lbl">Stamp progress at your restaurant</div>
-        <div class="cr-stamps" id="cr-stamps"></div>
-        <button class="btn-stamp" id="btn-stamp" onclick="addStamp()">✓ Add stamp for this visit</button>
-        <div class="stamp-done" id="stamp-done">✓ Stamp saved!</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ ANALYTICS TAB ═══ -->
+  <div id="tab-analytics" class="tab-section">
+    <div class="analytics-header">
+      <div>
+        <div class="analytics-title">Customer Database</div>
+        <div class="analytics-sub">All customers who have visited your restaurant</div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <input class="search-input" type="text" placeholder="Search name or phone..." oninput="filterAnalytics(this.value)">
+        <button class="btn-export" onclick="exportToExcel()">📥 Export to Excel</button>
       </div>
     </div>
 
-    <div class="side-panel">
-      <div class="mini-stat"><div class="ms-lbl">Scans today</div><div class="ms-val" id="stat-today">—</div></div>
-      <div class="mini-stat"><div class="ms-lbl">Total scans</div><div class="ms-val" id="stat-total">—</div></div>
-      <div class="recent-card">
-        <div class="recent-title">Recent scans</div>
-        <div id="recent-list"><div class="loading"><span class="spin"></span>Loading...</div></div>
+    <!-- Summary stats -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:1.5rem" id="analytics-stats">
+      <div style="background:var(--w);border:1px solid var(--bdr);border-radius:var(--r);padding:1.1rem">
+        <div style="font-size:11px;color:var(--txs);margin-bottom:5px">Total customers</div>
+        <div style="font-family:'Playfair Display',serif;font-size:26px;color:var(--gd)" id="an-total">—</div>
       </div>
+      <div style="background:var(--w);border:1px solid var(--bdr);border-radius:var(--r);padding:1.1rem">
+        <div style="font-size:11px;color:var(--txs);margin-bottom:5px">Total visits</div>
+        <div style="font-family:'Playfair Display',serif;font-size:26px;color:var(--gd)" id="an-visits">—</div>
+      </div>
+      <div style="background:var(--w);border:1px solid var(--bdr);border-radius:var(--r);padding:1.1rem">
+        <div style="font-size:11px;color:var(--txs);margin-bottom:5px">Rewards given</div>
+        <div style="font-family:'Playfair Display',serif;font-size:26px;color:var(--gd)" id="an-rewards">—</div>
+      </div>
+      <div style="background:var(--w);border:1px solid var(--bdr);border-radius:var(--r);padding:1.1rem">
+        <div style="font-size:11px;color:var(--txs);margin-bottom:5px">Birthdays this month</div>
+        <div style="font-family:'Playfair Display',serif;font-size:26px;color:#b45309" id="an-bdays">—</div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="thead" style="grid-template-columns:2fr 1.5fr 1fr 1fr 1fr 1.5fr">
+        <div>Customer</div><div>Phone</div><div>Birthday</div><div>Visits</div><div>Rewards</div><div>Last visit</div>
+      </div>
+      <div id="analytics-body"><div class="loading"><span class="spin"></span>Loading customer data...</div></div>
     </div>
   </div>
 </div>
@@ -236,8 +332,11 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
 <div class="toast" id="toast"></div>
 
 <script>
-let lookupData = null;
+let lookupData      = null;
+let allAnalytics    = [];
+const POINTS_PER_K  = 10; // 10 points per 1,000 SYP
 
+// ── AUTH ──
 function showLogin() {
   document.getElementById('login-view').style.display  = 'flex';
   document.getElementById('portal-view').style.display = 'none';
@@ -248,33 +347,36 @@ function showPortal() {
   document.getElementById('portal-view').style.display = 'block';
   document.getElementById('btn-out').style.display     = 'block';
 }
-
 async function doLogin() {
   const email = document.getElementById('li-email').value.trim();
   const pw    = document.getElementById('li-pw').value;
   const errEl = document.getElementById('li-err');
   errEl.classList.remove('show');
-  if (!email || !pw) { showErr(errEl, 'Please enter your email and password'); return; }
+  if (!email || !pw) { showErr(errEl,'Enter email and password'); return; }
   const btn = document.getElementById('btn-login');
-  btn.disabled = true; btn.textContent = 'Signing in...';
+  btn.disabled=true; btn.textContent='Signing in...';
   try {
     await window.fbFns.signInWithEmailAndPassword(window.auth, email, pw);
   } catch(e) {
     let msg = 'Incorrect email or password.';
-    if (e.code === 'auth/user-not-found')    msg = 'No account found. Contact WafaCard to get access.';
-    if (e.code === 'auth/wrong-password')    msg = 'Incorrect password.';
-    if (e.code === 'auth/too-many-requests') msg = 'Too many attempts. Please try again later.';
+    if (e.code==='auth/user-not-found')    msg='No account found. Contact WafaCard.';
+    if (e.code==='auth/wrong-password')    msg='Incorrect password.';
+    if (e.code==='auth/too-many-requests') msg='Too many attempts. Try again later.';
     showErr(errEl, msg);
-  } finally {
-    btn.disabled = false; btn.textContent = 'Sign in';
-  }
+  } finally { btn.disabled=false; btn.textContent='Sign in'; }
+}
+async function doSignOut() { await window.fbFns.signOut(window.auth); toast('Signed out'); }
+
+// ── TABS ──
+function showTab(id, el) {
+  document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.ptab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  el.classList.add('active');
+  if (id === 'analytics') loadAnalytics();
 }
 
-async function doSignOut() {
-  await window.fbFns.signOut(window.auth);
-  toast('Signed out');
-}
-
+// ── SCANNER ──
 function simulateScan() {
   const stored = localStorage.getItem('wfc_cardid');
   if (stored) { document.getElementById('manual-id').value = stored; lookupCustomer(); }
@@ -286,19 +388,23 @@ async function lookupCustomer() {
   if (!cardId) { toast('Enter a customer card ID', true); return; }
   try {
     const { collection, query, where, getDocs } = window.fbFns;
-    const q    = query(collection(window.db, 'customers'), where('cardId', '==', cardId));
+    const q    = query(collection(window.db,'customers'), where('cardId','==',cardId));
     const snap = await getDocs(q);
     if (snap.empty) { toast('Card not found', true); return; }
     lookupData = { id: snap.docs[0].id, ...snap.docs[0].data() };
     renderResult(lookupData);
-  } catch(e) { toast('Error: ' + e.message, true); }
+  } catch(e) { toast('Error: '+e.message, true); }
 }
 
 function renderResult(d) {
-  document.getElementById('cr-name').textContent = d.name;
-  document.getElementById('cr-sub').textContent  = d.phone + ' · ' + getTier(d.points).lbl;
-  document.getElementById('cr-pts').textContent  = (d.points || 0) + ' pts';
-  const stamps = d.stamps || 0;
+  const rName  = window.restaurantName || 'Restaurant';
+  const stamps = (typeof d.stamps === 'object' && d.stamps !== null) ? (d.stamps[rName] || 0) : 0;
+
+  document.getElementById('cr-name').textContent     = d.name;
+  document.getElementById('cr-sub').textContent      = d.phone + ' · ' + getTier(d.points).lbl + (d.birthday ? ' · 🎂 ' + formatBirthday(d.birthday) : '');
+  document.getElementById('cr-pts').textContent      = (d.points||0) + ' pts';
+  document.getElementById('cr-rest-name').textContent = rName;
+
   const el = document.getElementById('cr-stamps');
   el.innerHTML = '';
   for (let i = 1; i <= 9; i++) {
@@ -307,51 +413,103 @@ function renderResult(d) {
     s.textContent = i <= stamps ? '✓' : '';
     el.appendChild(s);
   }
+
+  document.getElementById('bill-amount').value = '';
+  document.getElementById('bill-pts-preview').textContent = '';
   document.getElementById('stamp-done').classList.remove('show');
   document.getElementById('btn-stamp').disabled = false;
   document.getElementById('btn-stamp').textContent = '✓ Add stamp for this visit';
   document.getElementById('cust-result').classList.add('show');
 }
 
+function updatePointsPreview() {
+  const bill  = parseFloat(document.getElementById('bill-amount').value) || 0;
+  const pts   = Math.floor(bill / 1000) * POINTS_PER_K;
+  const el    = document.getElementById('bill-pts-preview');
+  el.textContent = bill > 0 ? `This visit earns +${pts} points` : '';
+}
+
+// ── ADD STAMP ──
 async function addStamp() {
   if (!lookupData) return;
+  const bill  = parseFloat(document.getElementById('bill-amount').value) || 0;
+  if (!bill || bill <= 0) { toast('Please enter the bill amount first', true); return; }
+
   const btn = document.getElementById('btn-stamp');
-  btn.disabled = true; btn.textContent = 'Saving...';
+  btn.disabled=true; btn.textContent='Saving...';
+
   try {
     const { doc, updateDoc, collection, addDoc, serverTimestamp } = window.fbFns;
-    let newStamps = (lookupData.stamps || 0) + 1;
-    let newPoints = (lookupData.points || 0) + 10;
-    const freeMeal = newStamps >= 9;
-    if (freeMeal) newStamps = 0;
-    const newTier = getTier(newPoints).lbl.replace(/[🥉🥈🥇] /, '');
-    await updateDoc(doc(window.db, 'customers', lookupData.id), { stamps: newStamps, points: newPoints, tier: newTier });
-    await addDoc(collection(window.db, 'activity'), {
-      customerId: lookupData.id, customerName: lookupData.name,
-      cardId: lookupData.cardId, restaurant: window.restaurantName || 'Restaurant',
-      pointsAdded: 10, timestamp: serverTimestamp()
+    const rName = window.restaurantName || 'Restaurant';
+
+    // Get current stamps object
+    const currentStamps = (typeof lookupData.stamps === 'object' && lookupData.stamps !== null)
+      ? { ...lookupData.stamps }
+      : {};
+
+    // Increment this restaurant's stamp count
+    const currentCount = currentStamps[rName] || 0;
+    let   newCount     = currentCount + 1;
+    const freeMeal     = newCount >= 9;
+    if (freeMeal) newCount = 0; // reset after free meal
+
+    currentStamps[rName] = newCount;
+
+    // Calculate points from bill
+    const pointsEarned = Math.floor(bill / 1000) * POINTS_PER_K;
+    const newPoints    = (lookupData.points || 0) + pointsEarned;
+    const newTier      = getTier(newPoints).lbl.replace(/[🥉🥈🥇] /,'');
+
+    // Update customer document
+    await updateDoc(doc(window.db,'customers',lookupData.id), {
+      stamps: currentStamps,
+      points: newPoints,
+      tier: newTier
     });
-    lookupData.stamps = newStamps; lookupData.points = newPoints;
-    const msg = freeMeal ? '✓ Free meal earned! 🎉 Stamp card reset.' : '✓ Stamp saved! Now ' + newStamps + '/9.';
+
+    // Log activity
+    await addDoc(collection(window.db,'activity'), {
+      customerId:      lookupData.id,
+      customerName:    lookupData.name,
+      customerPhone:   lookupData.phone,
+      customerBirthday: lookupData.birthday || null,
+      cardId:          lookupData.cardId,
+      restaurant:      rName,
+      billAmount:      bill,
+      pointsAdded:     pointsEarned,
+      freeMealEarned:  freeMeal,
+      timestamp:       serverTimestamp()
+    });
+
+    // Update local data
+    lookupData.stamps = currentStamps;
+    lookupData.points = newPoints;
+
+    const msg = freeMeal
+      ? `✓ Free meal earned! 🎉 Stamp card reset. +${pointsEarned} pts`
+      : `✓ Stamp saved! ${newCount}/9 at ${rName}. +${pointsEarned} pts`;
     document.getElementById('stamp-done').textContent = msg;
     document.getElementById('stamp-done').classList.add('show');
     renderResult(lookupData);
-    toast('✓ Recorded');
-    loadStats(); loadRecentScans();
+    toast('✓ Recorded in Firebase');
+    loadStats();
+    loadRecentScans();
   } catch(e) {
-    toast('Error: ' + e.message, true);
-    btn.disabled = false; btn.textContent = '✓ Add stamp for this visit';
+    toast('Error: '+e.message, true);
+    btn.disabled=false; btn.textContent='✓ Add stamp for this visit';
   }
 }
 
+// ── STATS & RECENT SCANS ──
 async function loadStats() {
   try {
     const { collection, query, where, getDocs } = window.fbFns;
     const rn  = window.restaurantName || '';
-    const all = await getDocs(query(collection(window.db, 'activity'), where('restaurant', '==', rn)));
+    const all = await getDocs(query(collection(window.db,'activity'), where('restaurant','==',rn)));
     document.getElementById('stat-total').textContent = all.size;
     const today = new Date(); today.setHours(0,0,0,0);
-    let cnt = 0;
-    all.forEach(d => { const ts = d.data().timestamp; if (ts && ts.seconds*1000 >= today.getTime()) cnt++; });
+    let cnt=0;
+    all.forEach(d => { const ts=d.data().timestamp; if(ts && ts.seconds*1000>=today.getTime()) cnt++; });
     document.getElementById('stat-today').textContent = cnt;
   } catch(e) { console.error(e); }
 }
@@ -360,31 +518,149 @@ async function loadRecentScans() {
   try {
     const { collection, query, where, orderBy, limit, getDocs } = window.fbFns;
     const rn   = window.restaurantName || '';
-    const q    = query(collection(window.db, 'activity'), where('restaurant', '==', rn), orderBy('timestamp', 'desc'), limit(6));
+    const q    = query(collection(window.db,'activity'), where('restaurant','==',rn), orderBy('timestamp','desc'), limit(6));
     const snap = await getDocs(q);
     const el   = document.getElementById('recent-list');
-    if (snap.empty) { el.innerHTML = '<div style="font-size:13px;color:var(--txs);padding:8px 0">No scans yet</div>'; return; }
-    el.innerHTML = '';
+    if (snap.empty) { el.innerHTML='<div style="font-size:13px;color:var(--txs);padding:8px 0">No scans yet</div>'; return; }
+    el.innerHTML='';
     snap.forEach(d => {
       const data     = d.data();
-      const initials = data.customerName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
-      const time     = data.timestamp ? new Date(data.timestamp.seconds*1000).toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' }) : '—';
-      el.innerHTML += `<div class="scan-row"><div class="scan-avatar">${initials}</div><div><div class="scan-name">${data.customerName}</div><div style="font-size:11px;color:var(--txs)">+${data.pointsAdded} pts</div></div><div class="scan-time">${time}</div></div>`;
+      const initials = data.customerName.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+      const time     = data.timestamp ? new Date(data.timestamp.seconds*1000).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : '—';
+      const bill     = data.billAmount ? data.billAmount.toLocaleString() + ' SYP' : '';
+      el.innerHTML += `
+        <div class="scan-row">
+          <div class="scan-avatar">${initials}</div>
+          <div>
+            <div class="scan-name">${data.customerName}</div>
+            <div class="scan-bill">${bill ? bill + ' · ' : ''}+${data.pointsAdded||0} pts${data.freeMealEarned?' · 🎉 Free meal!':''}</div>
+          </div>
+          <div class="scan-time">${time}</div>
+        </div>`;
     });
   } catch(e) { console.error(e); }
 }
 
-function getTier(pts) {
-  if ((pts||0) >= 1000) return { lbl: '🥇 Gold' };
-  if ((pts||0) >= 500)  return { lbl: '🥈 Silver' };
-  return                       { lbl: '🥉 Bronze' };
+// ── ANALYTICS ──
+async function loadAnalytics() {
+  document.getElementById('analytics-body').innerHTML = '<div class="loading"><span class="spin"></span>Loading...</div>';
+  try {
+    const { collection, query, where, getDocs } = window.fbFns;
+    const rn      = window.restaurantName || '';
+    const actSnap = await getDocs(query(collection(window.db,'activity'), where('restaurant','==',rn)));
+
+    // Aggregate by customer
+    const customerMap = {};
+    actSnap.forEach(d => {
+      const data = d.data();
+      if (!customerMap[data.customerId]) {
+        customerMap[data.customerId] = {
+          id:       data.customerId,
+          name:     data.customerName,
+          phone:    data.customerPhone || '—',
+          birthday: data.customerBirthday || null,
+          visits:   0,
+          rewards:  0,
+          lastVisit: null
+        };
+      }
+      customerMap[data.customerId].visits++;
+      if (data.freeMealEarned) customerMap[data.customerId].rewards++;
+      const ts = data.timestamp ? data.timestamp.seconds * 1000 : 0;
+      if (!customerMap[data.customerId].lastVisit || ts > customerMap[data.customerId].lastVisit) {
+        customerMap[data.customerId].lastVisit = ts;
+      }
+    });
+
+    allAnalytics = Object.values(customerMap).sort((a,b) => b.visits - a.visits);
+
+    // Summary stats
+    const totalVisits   = allAnalytics.reduce((s,c) => s+c.visits, 0);
+    const totalRewards  = allAnalytics.reduce((s,c) => s+c.rewards, 0);
+    const thisMonth     = new Date().getMonth();
+    const bdaysThisMonth = allAnalytics.filter(c => {
+      if (!c.birthday) return false;
+      return new Date(c.birthday).getMonth() === thisMonth;
+    }).length;
+
+    document.getElementById('an-total').textContent   = allAnalytics.length;
+    document.getElementById('an-visits').textContent  = totalVisits;
+    document.getElementById('an-rewards').textContent = totalRewards;
+    document.getElementById('an-bdays').textContent   = bdaysThisMonth;
+
+    renderAnalytics(allAnalytics);
+  } catch(e) { console.error(e); document.getElementById('analytics-body').innerHTML = '<div class="empty">Error loading data</div>'; }
 }
-function showErr(el, msg) { el.textContent = msg; el.classList.add('show'); }
+
+function renderAnalytics(list) {
+  const el  = document.getElementById('analytics-body');
+  if (!list.length) { el.innerHTML='<div class="empty">No customers yet — start scanning cards!</div>'; return; }
+  const now       = new Date();
+  const thisMonth = now.getMonth();
+  el.innerHTML='';
+  list.forEach(c => {
+    const bd          = c.birthday ? new Date(c.birthday) : null;
+    const bdDisplay   = bd ? formatBirthday(c.birthday) : '—';
+    const isBdMonth   = bd && bd.getMonth() === thisMonth;
+    const bdBadge     = isBdMonth ? '<span class="birthday-soon">🎂 This month!</span>' : '';
+    const lastVisit   = c.lastVisit ? new Date(c.lastVisit).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '—';
+    el.innerHTML += `
+      <div class="trow" style="grid-template-columns:2fr 1.5fr 1fr 1fr 1fr 1.5fr">
+        <div class="tname">${c.name}</div>
+        <div style="color:var(--txs)">${c.phone}</div>
+        <div style="color:var(--txs)">${bdDisplay}${bdBadge}</div>
+        <div style="font-weight:500">${c.visits}</div>
+        <div style="color:var(--g);font-weight:500">${c.rewards}</div>
+        <div style="color:var(--txs);font-size:12px">${lastVisit}</div>
+      </div>`;
+  });
+}
+
+function filterAnalytics(val) {
+  const q        = val.toLowerCase();
+  const filtered = allAnalytics.filter(c => c.name.toLowerCase().includes(q) || (c.phone||'').includes(q));
+  renderAnalytics(filtered);
+}
+
+// ── EXCEL EXPORT ──
+function exportToExcel() {
+  if (!allAnalytics.length) { toast('No data to export yet', true); return; }
+  const rName = window.restaurantName || 'Restaurant';
+  const rows  = allAnalytics.map(c => ({
+    'Name':       c.name,
+    'Phone':      c.phone,
+    'Birthday':   c.birthday || '—',
+    'Visits':     c.visits,
+    'Rewards':    c.rewards,
+    'Last Visit': c.lastVisit ? new Date(c.lastVisit).toLocaleDateString('en-GB') : '—'
+  }));
+  const ws  = XLSX.utils.json_to_sheet(rows);
+  const wb  = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Customers');
+  const date = new Date().toISOString().split('T')[0];
+  XLSX.writeFile(wb, `${rName}-customers-${date}.xlsx`);
+  toast('✓ Excel file downloaded');
+}
+
+// ── HELPERS ──
+function getTier(pts) {
+  if ((pts||0)>=1000) return { lbl:'🥇 Gold' };
+  if ((pts||0)>=500)  return { lbl:'🥈 Silver' };
+  return                     { lbl:'🥉 Bronze' };
+}
+
+function formatBirthday(bd) {
+  if (!bd) return '—';
+  const d = new Date(bd);
+  return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+}
+
+function showErr(el, msg) { el.textContent=msg; el.classList.add('show'); }
 function toast(msg, isErr=false) {
   const t = document.getElementById('toast');
-  t.textContent = msg; t.className = 'toast' + (isErr ? ' err' : '');
+  t.textContent=msg; t.className='toast'+(isErr?' err':'');
   t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 3000);
+  setTimeout(()=>t.classList.remove('show'),3000);
 }
 </script>
 </body>
