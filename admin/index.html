@@ -427,7 +427,7 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
         <div class="table-title">Loyalty card customers</div>
         <input class="search-input" type="text" placeholder="Search name or phone..." oninput="filterCustomers(this.value)">
       </div>
-      <div class="thead" style="grid-template-columns:2fr 1.5fr 1fr 1fr 1fr"><div>Name</div><div>Phone</div><div>Age</div><div>Tier</div><div>Points</div></div>
+      <div class="thead" style="grid-template-columns:2fr 1.5fr 1fr 1fr 1fr"><div>Name</div><div>Phone</div><div>Birthday</div><div>Tier</div><div>Points</div></div>
       <div id="cust-body"><div class="loading"><span class="spin"></span>Loading...</div></div>
     </div>
   </div>
@@ -993,7 +993,7 @@ function renderCustomers(list) {
     el.innerHTML += `<div class="trow" style="grid-template-columns:2fr 1.5fr 1fr 1fr 1fr">
       <div class="tname">${c.name}</div>
       <div style="color:var(--txs)">${c.phone}</div>
-      <div style="color:var(--txs)">${c.age||'—'}</div>
+      <div style="color:var(--txs)">${c.birthday ? new Date(c.birthday).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '—'}</div>
       <div><span class="tier-badge ${t.cls}">${t.lbl.replace(/[🥉🥈🥇] /,'')}</span></div>
       <div>${c.points||0}</div>
     </div>`;
