@@ -8,9 +8,10 @@
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, addDoc, doc, getDoc, query, where, orderBy, limit, getDocs, serverTimestamp }
+  import { getFirestore, collection, addDoc, doc, getDoc, updateDoc, query, where, orderBy, limit, getDocs, serverTimestamp }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged }
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged,
+           updatePassword, reauthenticateWithCredential, EmailAuthProvider }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
   const cfg = {
@@ -28,8 +29,9 @@
   window.db   = db;
   window.auth = auth;
   window.fbFns = {
-    collection, addDoc, doc, getDoc, query, where, orderBy, limit, getDocs, serverTimestamp,
-    createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut
+    collection, addDoc, doc, getDoc, updateDoc, query, where, orderBy, limit, getDocs, serverTimestamp,
+    createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut,
+    updatePassword, reauthenticateWithCredential, EmailAuthProvider
   };
 
   // Listen to auth state — show card if logged in, login screen if not
@@ -184,6 +186,7 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
 .toast.err{background:#7f1d1d}
 .err-msg{font-size:12px;color:#dc2626;margin-top:6px;display:none}
 .err-msg.show{display:block}
+.suc-msg{font-size:12px;color:var(--g);margin-top:6px;font-weight:500}
 </style>
 </head>
 <body>
@@ -197,6 +200,7 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
     <button class="ntab active" onclick="showPage('home')">Home</button>
     <button class="ntab" onclick="showPage('signup')" id="nav-signup">Sign Up</button>
     <button class="ntab" onclick="showPage('mycard')" id="nav-mycard">My Card</button>
+    <button class="ntab" onclick="showPage('editprofile')" id="nav-edit" style="display:none">Edit Profile</button>
     <div class="nav-user" id="nav-user" style="display:none">
       <div class="nav-user-dot"></div>
       <span id="nav-user-name">—</span>
@@ -363,10 +367,62 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
             <div id="tier-bar" style="background:var(--g);height:100%;width:0%;border-radius:10px;transition:width .5s"></div>
           </div>
           <div style="font-size:12px;color:var(--txs);margin-top:6px" id="tier-note"></div>
+          <button class="switch-btn" onclick="showPage('editprofile')" style="margin-bottom:6px">✏️ Edit profile</button>
           <button class="switch-btn" onclick="doLogout()">↩ Sign out / switch account</button>
         </div>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- ═══ EDIT PROFILE ═══ -->
+<div id="page-editprofile" class="page">
+  <div style="max-width:480px;margin:0 auto">
+    <div class="ptitle">Edit Profile</div>
+    <div class="psub">Update your details — your phone number cannot be changed</div>
+
+    <!-- Profile info -->
+    <div class="auth-box" style="margin-bottom:1rem">
+      <div class="auth-title" style="font-size:18px;margin-bottom:1.25rem">Personal information</div>
+      <div class="fg">
+        <label>Full name — الاسم الكامل</label>
+        <input type="text" id="ep-name" placeholder="Ahmad Al-Khatib">
+      </div>
+      <div class="fg">
+        <label>Birthday — تاريخ الميلاد</label>
+        <input type="date" id="ep-birthday">
+      </div>
+      <div class="fg">
+        <label>Email address — البريد الإلكتروني <span style="color:var(--txs);font-weight:400">(optional)</span></label>
+        <input type="email" id="ep-email" placeholder="your@email.com">
+        <div class="hint">Used for future notifications — not required</div>
+      </div>
+      <div class="err-msg" id="ep-profile-err">—</div>
+      <div class="suc-msg" id="ep-profile-suc" style="font-size:12px;color:var(--g);margin-top:6px;display:none">—</div>
+      <button class="btn-submit" id="btn-save-profile" onclick="saveProfile()">Save changes</button>
+    </div>
+
+    <!-- Password change -->
+    <div class="auth-box" style="margin-bottom:1rem">
+      <div class="auth-title" style="font-size:18px;margin-bottom:1.25rem">Change password</div>
+      <div class="fg">
+        <label>Current password</label>
+        <input type="password" id="ep-cur-pw" placeholder="Your current password">
+      </div>
+      <div class="fg">
+        <label>New password</label>
+        <input type="password" id="ep-new-pw" placeholder="At least 6 characters">
+      </div>
+      <div class="fg">
+        <label>Confirm new password</label>
+        <input type="password" id="ep-new-pw2" placeholder="Repeat new password">
+      </div>
+      <div class="err-msg" id="ep-pw-err">—</div>
+      <div class="suc-msg" id="ep-pw-suc" style="font-size:12px;color:var(--g);margin-top:6px;display:none">—</div>
+      <button class="btn-submit" id="btn-save-pw" onclick="savePassword()">Update password</button>
+    </div>
+
+    <button class="switch-btn" onclick="showPage('mycard')" style="max-width:480px">← Back to my card</button>
   </div>
 </div>
 
@@ -378,19 +434,20 @@ function showPage(id) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.ntab').forEach(t => t.classList.remove('active'));
   document.getElementById('page-' + id).classList.add('active');
-  const map = ['home','signup','login','mycard'];
+  const map = ['home','signup','login','mycard','editprofile'];
   const idx = map.indexOf(id);
-  // Map login/signup to the same nav tab visually
   const navIdx = id === 'login' ? 1 : idx;
   if (navIdx >= 0) document.querySelectorAll('.ntab')[navIdx]?.classList.add('active');
-  if (id === 'mycard') initMyCard();
-  if (id === 'home')   loadHomeStats();
+  if (id === 'mycard')      initMyCard();
+  if (id === 'home')        loadHomeStats();
+  if (id === 'editprofile') initEditProfile();
   window.scrollTo(0, 0);
 }
 
 // ── NAV UI based on auth state ──
 function updateNavForAuth(loggedIn) {
   document.getElementById('nav-signup').style.display  = loggedIn ? 'none'  : 'block';
+  document.getElementById('nav-edit').style.display    = loggedIn ? 'block' : 'none';
   document.getElementById('nav-user').style.display    = loggedIn ? 'flex'  : 'none';
   document.getElementById('nav-logout').style.display  = loggedIn ? 'block' : 'none';
   if (loggedIn && window.curCardData) {
@@ -625,6 +682,101 @@ async function loadActivity() {
       el.innerHTML += `<div class="act-row"><div class="act-dot"></div><div>${data.restaurant} — stamp added</div><div class="act-time">${time}</div></div>`;
     });
   } catch(e) { console.error(e); }
+}
+
+// ── EDIT PROFILE ──
+function initEditProfile() {
+  const d = window.curCardData;
+  if (!d) { showPage('login'); return; }
+  document.getElementById('ep-name').value     = d.name     || '';
+  document.getElementById('ep-birthday').value = d.birthday || '';
+  document.getElementById('ep-email').value    = d.email    || '';
+  document.getElementById('ep-profile-err').classList.remove('show');
+  document.getElementById('ep-profile-suc').style.display = 'none';
+  document.getElementById('ep-pw-err').classList.remove('show');
+  document.getElementById('ep-pw-suc').style.display = 'none';
+  document.getElementById('ep-cur-pw').value  = '';
+  document.getElementById('ep-new-pw').value  = '';
+  document.getElementById('ep-new-pw2').value = '';
+}
+
+async function saveProfile() {
+  const name     = document.getElementById('ep-name').value.trim();
+  const birthday = document.getElementById('ep-birthday').value;
+  const email    = document.getElementById('ep-email').value.trim();
+  const errEl    = document.getElementById('ep-profile-err');
+  const sucEl    = document.getElementById('ep-profile-suc');
+  errEl.classList.remove('show'); sucEl.style.display = 'none';
+
+  if (!name)     { showErr(errEl, 'Name cannot be empty'); return; }
+  if (!birthday) { showErr(errEl, 'Birthday cannot be empty'); return; }
+
+  const btn = document.getElementById('btn-save-profile');
+  btn.disabled = true; btn.textContent = 'Saving...';
+
+  try {
+    const { doc, updateDoc } = window.fbFns;
+    const updates = { name, birthday };
+    if (email) updates.email = email;
+    await updateDoc(doc(window.db, 'customers', window.curDocId), updates);
+
+    // Update local data
+    window.curCardData.name     = name;
+    window.curCardData.birthday = birthday;
+    if (email) window.curCardData.email = email;
+
+    sucEl.textContent    = '✓ Profile updated successfully!';
+    sucEl.style.display  = 'block';
+    toast('✓ Profile saved');
+  } catch(e) {
+    showErr(errEl, 'Error saving: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save changes';
+  }
+}
+
+async function savePassword() {
+  const curPw  = document.getElementById('ep-cur-pw').value;
+  const newPw  = document.getElementById('ep-new-pw').value;
+  const newPw2 = document.getElementById('ep-new-pw2').value;
+  const errEl  = document.getElementById('ep-pw-err');
+  const sucEl  = document.getElementById('ep-pw-suc');
+  errEl.classList.remove('show'); sucEl.style.display = 'none';
+
+  if (!curPw)          { showErr(errEl, 'Enter your current password'); return; }
+  if (newPw.length < 6){ showErr(errEl, 'New password must be at least 6 characters'); return; }
+  if (newPw !== newPw2){ showErr(errEl, 'New passwords do not match'); return; }
+
+  const btn = document.getElementById('btn-save-pw');
+  btn.disabled = true; btn.textContent = 'Updating...';
+
+  try {
+    const { reauthenticateWithCredential, EmailAuthProvider, updatePassword } = window.fbFns;
+    const user       = window.auth.currentUser;
+    const phone      = window.curCardData.phone.replace(/\s+/g,'').replace(/[^0-9+]/g,'');
+    const fakeEmail  = phone + '@wafacard.sy';
+    const credential = EmailAuthProvider.credential(fakeEmail, curPw);
+
+    // Re-authenticate first
+    await reauthenticateWithCredential(user, credential);
+
+    // Now update password
+    await updatePassword(user, newPw);
+
+    sucEl.textContent   = '✓ Password updated successfully!';
+    sucEl.style.display = 'block';
+    document.getElementById('ep-cur-pw').value  = '';
+    document.getElementById('ep-new-pw').value  = '';
+    document.getElementById('ep-new-pw2').value = '';
+    toast('✓ Password updated');
+  } catch(e) {
+    let msg = e.message;
+    if (e.code === 'auth/wrong-password')    msg = 'Current password is incorrect.';
+    if (e.code === 'auth/too-many-requests') msg = 'Too many attempts. Try again later.';
+    showErr(errEl, msg);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Update password';
+  }
 }
 
 // ── HELPERS ──
