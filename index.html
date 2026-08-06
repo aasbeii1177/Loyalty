@@ -213,7 +213,7 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
     <div class="hero-sub">One card, every restaurant in Damascus. Earn points, collect stamps, unlock rewards — all digital, all instant.</div>
     <div class="hero-cta">
       <button class="btn-g" id="home-cta" onclick="showPage('signup')">Get your free card →</button>
-      <button class="btn-o" onclick="window.location.href='restaurant.html'">I'm a restaurant owner</button>
+      <button class="btn-o" onclick="window.location.href='restaurant/index.html'">I'm a restaurant owner</button>
     </div>
   </div>
   <div class="stat-row">
@@ -248,8 +248,9 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
           <input type="text" id="su-name" placeholder="Ahmad Al-Khatib" oninput="upPrev()">
         </div>
         <div class="fg">
-          <label>Age — العمر</label>
-          <input type="number" id="su-age" placeholder="24" min="13" max="90">
+          <label>Birthday — تاريخ الميلاد</label>
+          <input type="date" id="su-birthday">
+          <div class="hint">Used for your birthday reward at partner restaurants</div>
         </div>
         <div class="fg">
           <label>Password — كلمة المرور</label>
@@ -346,9 +347,8 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
       </div>
       <div class="card-panels">
         <div class="panel">
-          <div class="panel-title">Stamp progress</div>
-          <div class="stamp-row" id="stamp-display"></div>
-          <div style="font-size:12px;color:var(--txs);margin-top:8px" id="stamp-note"></div>
+          <div class="panel-title">Stamp progress — by restaurant</div>
+          <div id="restaurant-stamps-list"><div class="loading">Loading your stamps...</div></div>
         </div>
         <div class="panel">
           <div class="panel-title">Recent activity</div>
@@ -418,18 +418,18 @@ function phoneToEmail(phone) {
 
 // ── SIGN UP ──
 async function doSignup() {
-  const phone = document.getElementById('su-phone').value.trim();
-  const name  = document.getElementById('su-name').value.trim();
-  const age   = document.getElementById('su-age').value;
-  const pw    = document.getElementById('su-pw').value;
-  const pw2   = document.getElementById('su-pw2').value;
-  const errEl = document.getElementById('su-err');
+  const phone    = document.getElementById('su-phone').value.trim();
+  const name     = document.getElementById('su-name').value.trim();
+  const birthday = document.getElementById('su-birthday').value;
+  const pw       = document.getElementById('su-pw').value;
+  const pw2      = document.getElementById('su-pw2').value;
+  const errEl    = document.getElementById('su-err');
   errEl.classList.remove('show');
 
   // Validate
   if (!phone)        { showErr(errEl, 'Please enter your phone number'); return; }
   if (!name)         { showErr(errEl, 'Please enter your name'); return; }
-  if (!age)          { showErr(errEl, 'Please enter your age'); return; }
+  if (!birthday)     { showErr(errEl, 'Please enter your birthday'); return; }
   if (pw.length < 6) { showErr(errEl, 'Password must be at least 6 characters'); return; }
   if (pw !== pw2)    { showErr(errEl, 'Passwords do not match'); return; }
 
@@ -447,14 +447,15 @@ async function doSignup() {
     const cardId = 'WFC-' + Math.floor(1000 + Math.random() * 9000);
 
     // Save customer document in Firestore
+    // stamps is now an object: { "Restaurant Name": count }
     await addDoc(collection(window.db, 'customers'), {
       uid: cred.user.uid,
       cardId,
       name,
       phone,
-      age: parseInt(age),
+      birthday,
       points: 0,
-      stamps: 0,
+      stamps: {},
       tier: 'Bronze',
       createdAt: serverTimestamp()
     });
@@ -540,7 +541,8 @@ function renderCard(d) {
   const cardId = d.cardId || 'WFC-0000';
   document.getElementById('card-greeting').textContent = d.name.split(' ')[0] + "'s Card";
   document.getElementById('dc-name').textContent = d.name;
-  document.getElementById('dc-info').textContent = d.phone + ' · Age ' + (d.age || '—');
+  const bdDisplay = d.birthday ? new Date(d.birthday).toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : '—';
+  document.getElementById('dc-info').textContent = d.phone + ' · 🎂 ' + bdDisplay;
   document.getElementById('dc-pts').textContent  = d.points || 0;
   document.getElementById('dc-tier').textContent = getTier(d.points).lbl;
 
@@ -559,19 +561,8 @@ function renderCard(d) {
     correctLevel: QRCode.CorrectLevel.M
   });
 
-  // Stamps
-  const stamps = d.stamps || 0;
-  const el = document.getElementById('stamp-display');
-  el.innerHTML = '';
-  for (let i = 1; i <= 9; i++) {
-    const s = document.createElement('div');
-    s.className = 'stc' + (i <= stamps ? ' earned' : '');
-    s.textContent = i <= stamps ? '✓' : i;
-    el.appendChild(s);
-  }
-  document.getElementById('stamp-note').textContent = stamps >= 9
-    ? '🎉 Free meal unlocked! Show this to the restaurant.'
-    : stamps + ' of 9 — ' + (9 - stamps) + ' more for a free meal!';
+  // Per-restaurant stamps
+  renderRestaurantStamps(d.stamps || {});
 
   // Tier bar
   const pct = Math.min(100, Math.round(((d.points || 0) / 500) * 100));
@@ -580,6 +571,37 @@ function renderCard(d) {
 
   // Update nav
   updateNavForAuth(true);
+}
+
+function renderRestaurantStamps(stampsObj) {
+  const el = document.getElementById('restaurant-stamps-list');
+  if (!stampsObj || Object.keys(stampsObj).length === 0) {
+    el.innerHTML = '<div style="font-size:13px;color:var(--txs);padding:4px 0">No stamps yet — visit a partner restaurant to get started!</div>';
+    return;
+  }
+  // Sort by closest to free meal (most stamps first)
+  const sorted = Object.entries(stampsObj).sort((a, b) => b[1] - a[1]);
+  el.innerHTML = '';
+  sorted.forEach(([restaurant, count]) => {
+    const remaining = 9 - count;
+    const isFree    = count >= 9;
+    let note = isFree
+      ? '🎉 Free meal earned! Show your card.'
+      : remaining + ' more for a free meal' + (remaining === 1 ? ' 🔥' : '');
+    let stampsHtml = '';
+    for (let i = 1; i <= 9; i++) {
+      stampsHtml += `<div class="stc${i <= count ? ' earned' : ''}">${i <= count ? '✓' : i}</div>`;
+    }
+    el.innerHTML += `
+      <div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--bdr)">
+        <div style="font-size:13px;font-weight:500;margin-bottom:7px;color:var(--txt)">${restaurant}</div>
+        <div class="stamp-row">${stampsHtml}</div>
+        <div style="font-size:11px;color:var(--txs);margin-top:5px">${note}</div>
+      </div>`;
+  });
+  // Remove last border
+  const last = el.querySelector('div:last-child');
+  if (last) last.style.borderBottom = 'none';
 }
 
 async function loadActivity() {
