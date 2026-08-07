@@ -685,7 +685,6 @@ async function loadAnalytics() {
       }
       customerMap[data.customerId].visits++;
       if (data.freeMealEarned) customerMap[data.customerId].rewards++;
-      const ts = data.timestamp ? data.timestamp.seconds * 1000 : 0;
       if (!customerMap[data.customerId].lastVisit || ts > customerMap[data.customerId].lastVisit) {
         customerMap[data.customerId].lastVisit = ts;
       }
