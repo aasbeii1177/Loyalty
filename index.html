@@ -660,6 +660,7 @@ function renderCard(d) {
 
   // Per-restaurant stamps
   renderRestaurantStamps(d.stamps || {});
+  loadRestaurantCategories();
 
   // Tier bar
   const pct = Math.min(100, Math.round(((d.points || 0) / 500) * 100));
@@ -675,19 +676,43 @@ let currentSort     = 'closest';
 let currentCategory = 'all';
 let currentStampsObj = {};
 
-// Category keywords to auto-detect restaurant type
+// Restaurant category cache — loaded from Firestore
+let restaurantCategoryCache = {};
+
+async function loadRestaurantCategories() {
+  try {
+    const { collection, getDocs } = window.fbFns;
+    const snap = await getDocs(collection(window.db, 'restaurants'));
+    snap.forEach(d => {
+      const data = d.data();
+      if (data.name && data.category) {
+        restaurantCategoryCache[data.name] = data.category;
+      }
+    });
+  } catch(e) { console.error(e); }
+}
+
+// Category keywords as fallback if not in cache
 const CAT_KEYWORDS = {
   cafe:  ['café','cafe','coffee','قهوة','نور','كافيه'],
-  shop:  ['shop','store','market','متجر','سوق'],
-  food:  ['shawarma','pizza','burger','فطور','مطعم','فول','restaurant','grill','بيت']
+  shop:  ['shop','store','market','متجر','سوق','electronics','pharmacy','clothing','salon','gym','bookstore'],
+  food:  ['shawarma','pizza','burger','فطور','مطعم','فول','restaurant','grill','بيت','fastfood','bakery','juice','icecream']
 };
 
 function detectCategory(name) {
+  // First check the cache from Firestore
+  const stored = restaurantCategoryCache[name];
+  if (stored) {
+    if (['cafe','juice','icecream'].includes(stored)) return 'cafe';
+    if (['shop','pharmacy','gym','salon','electronics','clothing','bookstore'].includes(stored)) return 'shop';
+    return 'food'; // restaurant, fastfood, bakery, other → food
+  }
+  // Fallback to keyword detection
   const lower = name.toLowerCase();
   for (const [cat, keywords] of Object.entries(CAT_KEYWORDS)) {
     if (keywords.some(k => lower.includes(k))) return cat;
   }
-  return 'food'; // default to food
+  return 'food';
 }
 
 function selectCategory(cat, el) {
