@@ -280,18 +280,44 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
     <div class="panel">
       <div class="panel-title">Add new restaurant partner</div>
       <div class="panel-sub">Create a login account for a restaurant. Give them their email and password once done.</div>
-      <div class="form-row cols4">
+      <div class="form-row cols4" style="margin-bottom:10px">
         <div class="fg fg-inline"><label>Restaurant name</label><input type="text" id="cr-name" placeholder="Shawarma Palace"></div>
         <div class="fg fg-inline"><label>Login email</label><input type="email" id="cr-email" placeholder="restaurant@example.com"></div>
         <div class="fg fg-inline"><label>Password</label><input type="text" id="cr-pw" placeholder="Create a password"></div>
         <button class="btn-action" onclick="createRestaurant()">Create account</button>
+      </div>
+      <div class="form-row cols2" style="margin-bottom:10px">
+        <div class="fg fg-inline">
+          <label>Type / Category</label>
+          <select id="cr-category">
+            <option value="">Select type</option>
+            <option value="restaurant">🍽 Restaurant</option>
+            <option value="fastfood">🍔 Fast food</option>
+            <option value="cafe">☕ Cafe</option>
+            <option value="bakery">🥐 Bakery & pastry</option>
+            <option value="juice">🥤 Juice & smoothies</option>
+            <option value="icecream">🍦 Ice cream & desserts</option>
+            <option value="shop">🛍 Shop</option>
+            <option value="pharmacy">💊 Pharmacy</option>
+            <option value="gym">🏋️ Gym & sports</option>
+            <option value="salon">✂️ Salon & barber</option>
+            <option value="electronics">💻 Electronics</option>
+            <option value="clothing">👕 Clothing</option>
+            <option value="bookstore">📚 Books & stationery</option>
+            <option value="other">🏪 Other</option>
+          </select>
+        </div>
+        <div class="fg fg-inline">
+          <label>Location / Branch <span style="font-weight:400;color:var(--txs)">(optional)</span></label>
+          <input type="text" id="cr-location" placeholder="e.g. Mazzeh · Old City">
+        </div>
       </div>
       <div class="err-msg" id="cr-err">—</div>
       <div class="suc-msg" id="cr-suc">—</div>
     </div>
     <div class="table-card">
       <div class="table-top"><div class="table-title">All partner restaurants</div></div>
-      <div class="thead" style="grid-template-columns:2fr 2fr 1fr 1fr 180px"><div>Restaurant</div><div>Email</div><div>Joined</div><div>Status</div><div>Actions</div></div>
+      <div class="thead" style="grid-template-columns:2fr 1.5fr 1fr 1fr 1fr 180px"><div>Restaurant</div><div>Email</div><div>Type</div><div>Location</div><div>Status</div><div>Actions</div></div>
       <div id="rest-body"><div class="loading"><span class="spin"></span>Loading...</div></div>
     </div>
   </div>
@@ -621,25 +647,34 @@ async function loadAll() {
 
 // ── RESTAURANTS ──
 async function createRestaurant() {
-  const name  = document.getElementById('cr-name').value.trim();
-  const email = document.getElementById('cr-email').value.trim();
-  const pw    = document.getElementById('cr-pw').value.trim();
-  const errEl = document.getElementById('cr-err');
-  const sucEl = document.getElementById('cr-suc');
+  const name     = document.getElementById('cr-name').value.trim();
+  const email    = document.getElementById('cr-email').value.trim();
+  const pw       = document.getElementById('cr-pw').value.trim();
+  const category = document.getElementById('cr-category').value;
+  const location = document.getElementById('cr-location').value.trim();
+  const errEl    = document.getElementById('cr-err');
+  const sucEl    = document.getElementById('cr-suc');
   errEl.classList.remove('show'); sucEl.classList.remove('show');
-  if (!name || !email || !pw) { errEl.textContent='Fill all fields'; errEl.classList.add('show'); return; }
-  if (pw.length < 6) { errEl.textContent='Password must be 6+ characters'; errEl.classList.add('show'); return; }
+  if (!name || !email || !pw)  { errEl.textContent='Fill name, email and password'; errEl.classList.add('show'); return; }
+  if (!category)               { errEl.textContent='Select a category type'; errEl.classList.add('show'); return; }
+  if (pw.length < 6)           { errEl.textContent='Password must be 6+ characters'; errEl.classList.add('show'); return; }
   const btn = document.querySelector('#tab-restaurants .btn-action');
   btn.disabled = true; btn.textContent = 'Creating...';
   try {
     const { createUserWithEmailAndPassword, collection, addDoc, serverTimestamp } = window.fbFns;
     const cred = await createUserWithEmailAndPassword(window.auth, email, pw);
-    await addDoc(collection(window.db,'restaurants'), { uid:cred.user.uid, name, email, disabled:false, createdAt:serverTimestamp() });
-    sucEl.textContent = `✓ Created "${name}" — Email: ${email} · Password: ${pw}`;
+    await addDoc(collection(window.db,'restaurants'), {
+      uid: cred.user.uid, name, email,
+      category, location: location || null,
+      disabled: false, createdAt: serverTimestamp()
+    });
+    sucEl.textContent = `✓ Created "${name}" (${category}) — Email: ${email} · Password: ${pw}`;
     sucEl.classList.add('show');
-    document.getElementById('cr-name').value = '';
-    document.getElementById('cr-email').value = '';
-    document.getElementById('cr-pw').value = '';
+    document.getElementById('cr-name').value     = '';
+    document.getElementById('cr-email').value    = '';
+    document.getElementById('cr-pw').value       = '';
+    document.getElementById('cr-category').value = '';
+    document.getElementById('cr-location').value = '';
     toast('✓ Restaurant account created');
     loadAll();
   } catch(e) {
@@ -660,7 +695,15 @@ function renderRestaurants(list) {
     const toggleBtn = disabled
       ? `<button class="btn-sm btn-enable" onclick="toggleRestaurant('${r.id}',true,'${r.name}')">Enable</button>`
       : `<button class="btn-sm btn-disable" onclick="toggleRestaurant('${r.id}',false,'${r.name}')">Disable</button>`;
-    el.innerHTML += `<div class="trow" style="grid-template-columns:2fr 2fr 1fr 1fr 180px"><div class="tname">${r.name}</div><div style="color:var(--txs);font-size:12px">${r.email}</div><div style="color:var(--txs);font-size:12px">${joined}</div><div>${badge}</div><div class="action-btns">${toggleBtn}<button class="btn-sm btn-delete" onclick="confirmDeleteRestaurant('${r.id}','${r.name}')">Delete</button></div></div>`;
+    const catLabel = getCategoryLabel(r.category);
+    el.innerHTML += `<div class="trow" style="grid-template-columns:2fr 1.5fr 1fr 1fr 1fr 180px">
+      <div class="tname">${r.name}</div>
+      <div style="color:var(--txs);font-size:12px">${r.email}</div>
+      <div style="font-size:12px">${catLabel}</div>
+      <div style="color:var(--txs);font-size:12px">${r.location||'—'}</div>
+      <div>${badge}</div>
+      <div class="action-btns">${toggleBtn}<button class="btn-sm btn-delete" onclick="confirmDeleteRestaurant('${r.id}','${r.name}')">Delete</button></div>
+    </div>`;
   });
 }
 
@@ -1006,6 +1049,19 @@ function filterCustomers(val) {
 }
 
 // ── HELPERS ──
+function getCategoryLabel(cat) {
+  const map = {
+    restaurant: '🍽 Restaurant', fastfood: '🍔 Fast food',
+    cafe: '☕ Cafe', bakery: '🥐 Bakery',
+    juice: '🥤 Juice', icecream: '🍦 Desserts',
+    shop: '🛍 Shop', pharmacy: '💊 Pharmacy',
+    gym: '🏋️ Gym', salon: '✂️ Salon',
+    electronics: '💻 Electronics', clothing: '👕 Clothing',
+    bookstore: '📚 Books', other: '🏪 Other'
+  };
+  return map[cat] || (cat ? cat : '—');
+}
+
 function getTier(pts) {
   if (pts>=1000) return { lbl:'🥇 Gold',   cls:'tg' };
   if (pts>=500)  return { lbl:'🥈 Silver', cls:'tsv' };
