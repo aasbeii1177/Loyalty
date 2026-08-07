@@ -187,6 +187,23 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
 .err-msg{font-size:12px;color:#dc2626;margin-top:6px;display:none}
 .err-msg.show{display:block}
 .suc-msg{font-size:12px;color:var(--g);margin-top:6px;font-weight:500}
+.cat-tab,.sort-tab{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:500;cursor:pointer;border:1px solid var(--bdr);background:var(--sfc);color:var(--txs);font-family:'DM Sans',sans-serif;transition:all .15s}
+.cat-tab:hover,.sort-tab:hover{border-color:var(--g);color:var(--g)}
+.cat-tab.active,.sort-tab.active{background:var(--g);border-color:var(--g);color:#fff}
+.rest-row{border:1px solid var(--bdr);border-radius:var(--rs);margin-bottom:6px;overflow:hidden;transition:all .2s}
+.rest-row-header{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;cursor:pointer;background:var(--sfc);transition:background .15s}
+.rest-row-header:hover{background:var(--gl)}
+.rest-row-name{font-size:13px;font-weight:500;color:var(--txt)}
+.rest-row-meta{display:flex;align-items:center;gap:8px}
+.rest-row-count{font-size:12px;color:var(--g);font-weight:500}
+.rest-row-mini{display:flex;gap:3px}
+.rest-dot{width:8px;height:8px;border-radius:50%;border:1.5px solid var(--bdr);background:#fff}
+.rest-dot.filled{background:var(--g);border-color:var(--g)}
+.rest-dot.free{background:#f59e0b;border-color:#f59e0b}
+.rest-row-chevron{font-size:12px;color:var(--txs);transition:transform .2s}
+.rest-row-chevron.open{transform:rotate(180deg)}
+.rest-row-body{display:none;padding:12px;border-top:1px solid var(--bdr);background:#fff}
+.rest-row-body.open{display:block;animation:fu .2s ease}
 </style>
 </head>
 <body>
@@ -352,6 +369,29 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
       <div class="card-panels">
         <div class="panel">
           <div class="panel-title">Stamp progress — by restaurant</div>
+
+          <!-- Search bar -->
+          <div style="margin-bottom:8px">
+            <input type="text" id="stamp-search" placeholder="🔍 Search restaurant..." oninput="filterAndRenderStamps()"
+              style="width:100%;padding:8px 12px;border:1px solid var(--bdr);border-radius:var(--rs);font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+          </div>
+
+          <!-- Category tabs -->
+          <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px" id="cat-tabs">
+            <button class="cat-tab active" onclick="selectCategory('all',this)">All</button>
+            <button class="cat-tab" onclick="selectCategory('food',this)">🍔 Food</button>
+            <button class="cat-tab" onclick="selectCategory('cafe',this)">☕ Cafes</button>
+            <button class="cat-tab" onclick="selectCategory('shop',this)">🛍 Shops</button>
+          </div>
+
+          <!-- Sort options -->
+          <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px" id="sort-tabs">
+            <button class="sort-tab active" onclick="selectSort('closest',this)">🔥 Closest</button>
+            <button class="sort-tab" onclick="selectSort('most',this)">⭐ Most visited</button>
+            <button class="sort-tab" onclick="selectSort('az',this)">A–Z</button>
+          </div>
+
+          <!-- Stamp list -->
           <div id="restaurant-stamps-list"><div class="loading">Loading your stamps...</div></div>
         </div>
         <div class="panel">
@@ -630,35 +670,129 @@ function renderCard(d) {
   updateNavForAuth(true);
 }
 
+// ── STAMP DISPLAY STATE ──
+let currentSort     = 'closest';
+let currentCategory = 'all';
+let currentStampsObj = {};
+
+// Category keywords to auto-detect restaurant type
+const CAT_KEYWORDS = {
+  cafe:  ['café','cafe','coffee','قهوة','نور','كافيه'],
+  shop:  ['shop','store','market','متجر','سوق'],
+  food:  ['shawarma','pizza','burger','فطور','مطعم','فول','restaurant','grill','بيت']
+};
+
+function detectCategory(name) {
+  const lower = name.toLowerCase();
+  for (const [cat, keywords] of Object.entries(CAT_KEYWORDS)) {
+    if (keywords.some(k => lower.includes(k))) return cat;
+  }
+  return 'food'; // default to food
+}
+
+function selectCategory(cat, el) {
+  currentCategory = cat;
+  document.querySelectorAll('.cat-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  filterAndRenderStamps();
+}
+
+function selectSort(sort, el) {
+  currentSort = sort;
+  document.querySelectorAll('.sort-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  filterAndRenderStamps();
+}
+
+function filterAndRenderStamps() {
+  const search = (document.getElementById('stamp-search')?.value || '').toLowerCase();
+  let entries  = Object.entries(currentStampsObj);
+
+  // Filter by search
+  if (search) entries = entries.filter(([name]) => name.toLowerCase().includes(search));
+
+  // Filter by category
+  if (currentCategory !== 'all') {
+    entries = entries.filter(([name]) => detectCategory(name) === currentCategory);
+  }
+
+  // Sort
+  if (currentSort === 'closest') {
+    entries.sort((a, b) => b[1] - a[1]); // most stamps = closest to free
+  } else if (currentSort === 'most') {
+    entries.sort((a, b) => b[1] - a[1]); // same for now, can track visit count later
+  } else if (currentSort === 'az') {
+    entries.sort((a, b) => a[0].localeCompare(b[0]));
+  }
+
+  renderStampRows(entries);
+}
+
+function renderStampRows(entries) {
+  const el = document.getElementById('restaurant-stamps-list');
+  if (!entries.length) {
+    el.innerHTML = '<div style="font-size:13px;color:var(--txs);padding:8px 0">No restaurants found</div>';
+    return;
+  }
+
+  el.innerHTML = '';
+  entries.forEach(([restaurant, count], index) => {
+    const remaining = 9 - count;
+    const isFree    = count >= 9;
+    const note      = isFree
+      ? '🎉 Free meal earned! Show your card to the restaurant.'
+      : remaining + ' more stamp' + (remaining === 1 ? '' : 's') + ' for a free meal' + (remaining === 1 ? ' 🔥' : '');
+
+    // Mini dot row for collapsed view
+    let miniDots = '';
+    for (let i = 1; i <= 9; i++) {
+      const cls = i <= count ? (isFree ? 'rest-dot free' : 'rest-dot filled') : 'rest-dot';
+      miniDots += `<div class="${cls}"></div>`;
+    }
+
+    // Full stamp row for expanded view
+    let stampsHtml = '';
+    for (let i = 1; i <= 9; i++) {
+      stampsHtml += `<div class="stc${i <= count ? ' earned' : ''}">${i <= count ? '✓' : i}</div>`;
+    }
+
+    const rowId = 'rest-row-' + index;
+    el.innerHTML += `
+      <div class="rest-row" id="${rowId}">
+        <div class="rest-row-header" onclick="toggleStampRow('${rowId}')">
+          <div>
+            <div class="rest-row-name">${restaurant}</div>
+            <div style="font-size:11px;color:${isFree ? '#f59e0b' : 'var(--txs)'};margin-top:2px">${isFree ? '🎉 Free meal ready!' : count + '/9 stamps'}</div>
+          </div>
+          <div class="rest-row-meta">
+            <div class="rest-row-mini">${miniDots}</div>
+            <div class="rest-row-chevron" id="${rowId}-chev">▾</div>
+          </div>
+        </div>
+        <div class="rest-row-body" id="${rowId}-body">
+          <div class="stamp-row" style="margin-bottom:8px">${stampsHtml}</div>
+          <div style="font-size:12px;color:var(--txs)">${note}</div>
+        </div>
+      </div>`;
+  });
+}
+
+function toggleStampRow(rowId) {
+  const body = document.getElementById(rowId + '-body');
+  const chev = document.getElementById(rowId + '-chev');
+  const isOpen = body.classList.contains('open');
+  body.classList.toggle('open', !isOpen);
+  chev.classList.toggle('open', !isOpen);
+}
+
 function renderRestaurantStamps(stampsObj) {
+  currentStampsObj = stampsObj || {};
   const el = document.getElementById('restaurant-stamps-list');
   if (!stampsObj || Object.keys(stampsObj).length === 0) {
     el.innerHTML = '<div style="font-size:13px;color:var(--txs);padding:4px 0">No stamps yet — visit a partner restaurant to get started!</div>';
     return;
   }
-  // Sort by closest to free meal (most stamps first)
-  const sorted = Object.entries(stampsObj).sort((a, b) => b[1] - a[1]);
-  el.innerHTML = '';
-  sorted.forEach(([restaurant, count]) => {
-    const remaining = 9 - count;
-    const isFree    = count >= 9;
-    let note = isFree
-      ? '🎉 Free meal earned! Show your card.'
-      : remaining + ' more for a free meal' + (remaining === 1 ? ' 🔥' : '');
-    let stampsHtml = '';
-    for (let i = 1; i <= 9; i++) {
-      stampsHtml += `<div class="stc${i <= count ? ' earned' : ''}">${i <= count ? '✓' : i}</div>`;
-    }
-    el.innerHTML += `
-      <div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--bdr)">
-        <div style="font-size:13px;font-weight:500;margin-bottom:7px;color:var(--txt)">${restaurant}</div>
-        <div class="stamp-row">${stampsHtml}</div>
-        <div style="font-size:11px;color:var(--txs);margin-top:5px">${note}</div>
-      </div>`;
-  });
-  // Remove last border
-  const last = el.querySelector('div:last-child');
-  if (last) last.style.borderBottom = 'none';
+  filterAndRenderStamps();
 }
 
 async function loadActivity() {
