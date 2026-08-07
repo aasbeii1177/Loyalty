@@ -244,8 +244,17 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
   </div>
   <div class="how-grid">
     <div class="how-card"><div class="how-num">1</div><h3>Sign up free</h3><p>Enter your phone number and create a password. Your card is ready in seconds.</p></div>
-    <div class="how-card"><div class="how-num">2</div><h3>Visit partners</h3><p>Show your QR at any partner restaurant. They scan it and your stamp is saved automatically.</p></div>
-    <div class="how-card"><div class="how-num">3</div><h3>Earn rewards</h3><p>Fill your stamp card for free meals. Collect points to unlock Silver and Gold tier perks.</p></div>
+    <div class="how-card"><div class="how-num">2</div><h3>Visit partners</h3><p>Show your QR at any partner restaurant or shop. They scan it and your stamp is saved automatically.</p></div>
+    <div class="how-card"><div class="how-num">3</div><h3>Earn rewards</h3><p>Fill your stamp card and earn a free meal. Collect points for upcoming exclusive rewards.</p></div>
+  </div>
+
+  <!-- Partner restaurants -->
+  <div style="margin-top:1.5rem">
+    <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:500;margin-bottom:4px">Our partners</div>
+    <div style="font-size:13px;color:var(--txs);margin-bottom:1rem">Earn stamps and rewards at all these locations</div>
+    <div id="home-partners" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px">
+      <div class="loading"><span class="spin"></span>Loading partners...</div>
+    </div>
   </div>
 </div>
 
@@ -362,7 +371,10 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
           <div class="dcqr"><div id="qrcode"></div></div>
           <div class="dcbt">
             <div><div class="dcpl">Total Points</div><div class="dcpn" id="dc-pts">0</div></div>
-            <div class="dctb" id="dc-tier">🥉 Bronze</div>
+            <div style="text-align:right">
+              <div class="dcpl">Card ID</div>
+              <div style="font-size:13px;opacity:.7;font-family:monospace" id="dc-cardid">—</div>
+            </div>
           </div>
         </div>
       </div>
@@ -399,15 +411,13 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
           <div id="activity-list"><div class="loading">No activity yet</div></div>
         </div>
         <div class="panel">
-          <div class="panel-title">Tier progress</div>
-          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--txs);margin-bottom:6px">
-            <span>Bronze</span><span>Silver (500 pts)</span>
+          <div class="panel-title">Your points</div>
+          <div style="font-family:'Playfair Display',serif;font-size:36px;color:var(--gd);margin-bottom:4px" id="pts-display">0</div>
+          <div style="font-size:12px;color:var(--txs);margin-bottom:1rem">points collected across all restaurants</div>
+          <div style="background:var(--gp);border-radius:var(--rs);padding:10px 14px;font-size:12px;color:var(--gd);line-height:1.55">
+            🎁 Points unlock exclusive rewards and benefits — stay tuned for our upcoming loyalty tiers!
           </div>
-          <div style="background:var(--bdr);border-radius:10px;height:8px;overflow:hidden">
-            <div id="tier-bar" style="background:var(--g);height:100%;width:0%;border-radius:10px;transition:width .5s"></div>
-          </div>
-          <div style="font-size:12px;color:var(--txs);margin-top:6px" id="tier-note"></div>
-          <button class="switch-btn" onclick="showPage('editprofile')" style="margin-bottom:6px">✏️ Edit profile</button>
+          <button class="switch-btn" onclick="showPage('editprofile')" style="margin-top:12px;margin-bottom:6px">✏️ Edit profile</button>
           <button class="switch-btn" onclick="doLogout()">↩ Sign out / switch account</button>
         </div>
       </div>
@@ -463,6 +473,19 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
     </div>
 
     <button class="switch-btn" onclick="showPage('mycard')" style="max-width:480px">← Back to my card</button>
+  </div>
+</div>
+
+<!-- FREE MEAL MODAL -->
+<div id="free-meal-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:300;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:20px;padding:2.5rem;max-width:360px;width:90%;text-align:center;box-shadow:var(--shl);animation:fu .4s ease">
+    <div style="font-size:64px;margin-bottom:1rem">🎉</div>
+    <div style="font-family:'Playfair Display',serif;font-size:24px;font-weight:500;margin-bottom:8px">Free meal earned!</div>
+    <div style="font-size:14px;color:var(--txs);margin-bottom:6px" id="free-meal-restaurant">—</div>
+    <div style="font-size:13px;color:var(--txs);margin-bottom:1.5rem;line-height:1.6">Show your QR code to the restaurant to claim your free meal. Your stamp card has been reset.</div>
+    <button onclick="closeFreeModal()" style="background:var(--gd);color:#fff;border:none;border-radius:var(--rs);padding:12px 28px;font-size:14px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
+      Got it! 🎊
+    </button>
   </div>
 </div>
 
@@ -635,13 +658,14 @@ function renderCard(d) {
   document.getElementById('mc-loggedout').style.display = 'none';
   document.getElementById('mc-content').style.display   = 'block';
 
-  const cardId = d.cardId || 'WFC-0000';
-  document.getElementById('card-greeting').textContent = d.name.split(' ')[0] + "'s Card";
-  document.getElementById('dc-name').textContent = d.name;
+  const cardId    = d.cardId || 'WFC-0000';
   const bdDisplay = d.birthday ? new Date(d.birthday).toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : '—';
-  document.getElementById('dc-info').textContent = d.phone + ' · 🎂 ' + bdDisplay;
-  document.getElementById('dc-pts').textContent  = d.points || 0;
-  document.getElementById('dc-tier').textContent = getTier(d.points).lbl;
+  document.getElementById('card-greeting').textContent  = d.name.split(' ')[0] + "'s Card";
+  document.getElementById('dc-name').textContent        = d.name;
+  document.getElementById('dc-info').textContent        = d.phone + ' · 🎂 ' + bdDisplay;
+  document.getElementById('dc-pts').textContent         = d.points || 0;
+  document.getElementById('dc-cardid').textContent      = cardId;
+  document.getElementById('pts-display').textContent    = d.points || 0;
 
   const joined = d.createdAt
     ? new Date(d.createdAt.seconds * 1000).toLocaleDateString('en-GB', { month:'short', year:'numeric' })
@@ -662,10 +686,13 @@ function renderCard(d) {
   renderRestaurantStamps(d.stamps || {});
   loadRestaurantCategories();
 
-  // Tier bar
-  const pct = Math.min(100, Math.round(((d.points || 0) / 500) * 100));
-  document.getElementById('tier-bar').style.width  = pct + '%';
-  document.getElementById('tier-note').textContent = (d.points || 0) + ' / 500 points to Silver';
+  // Check if any restaurant has a free meal ready — show notification dot
+  const stamps = d.stamps || {};
+  const hasFree = Object.values(stamps).some(count => count >= 9);
+  const navMycard = document.querySelectorAll('.ntab')[2];
+  if (navMycard) {
+    navMycard.innerHTML = hasFree ? 'My Card <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#f59e0b;vertical-align:2px;margin-left:2px"></span>' : 'My Card';
+  }
 
   // Update nav
   updateNavForAuth(true);
@@ -761,9 +788,11 @@ function renderStampRows(entries) {
   }
 
   el.innerHTML = '';
+  let freeMealRestaurant = null;
   entries.forEach(([restaurant, count], index) => {
     const remaining = 9 - count;
     const isFree    = count >= 9;
+    if (isFree && !freeMealRestaurant) freeMealRestaurant = restaurant;
     const note      = isFree
       ? '🎉 Free meal earned! Show your card to the restaurant.'
       : remaining + ' more stamp' + (remaining === 1 ? '' : 's') + ' for a free meal' + (remaining === 1 ? ' 🔥' : '');
@@ -945,6 +974,44 @@ function getTier(pts) {
   return                         { lbl: '🥉 Bronze' };
 }
 
+// ── FREE MEAL MODAL ──
+function showFreeModal(restaurant) {
+  document.getElementById('free-meal-restaurant').textContent = '🏆 ' + restaurant + ' — stamp card completed!';
+  const modal = document.getElementById('free-meal-modal');
+  modal.style.display = 'flex';
+}
+function closeFreeModal() {
+  document.getElementById('free-meal-modal').style.display = 'none';
+}
+
+// ── PARTNER RESTAURANTS ON HOME ──
+async function loadHomePartners() {
+  try {
+    const { collection, getDocs, query, where } = window.fbFns;
+    const snap = await getDocs(query(collection(window.db,'restaurants'), where('disabled','==',false)));
+    const el   = document.getElementById('home-partners');
+    if (!el) return;
+    if (snap.empty) { el.innerHTML = '<div style="font-size:13px;color:var(--txs)">Coming soon — partners joining shortly!</div>'; return; }
+    const catIcons = {
+      restaurant:'🍽', fastfood:'🍔', cafe:'☕', bakery:'🥐',
+      juice:'🥤', icecream:'🍦', shop:'🛍', pharmacy:'💊',
+      gym:'🏋️', salon:'✂️', electronics:'💻', clothing:'👕',
+      bookstore:'📚', other:'🏪'
+    };
+    el.innerHTML = '';
+    snap.forEach(d => {
+      const r    = d.data();
+      const icon = catIcons[r.category] || '🏪';
+      el.innerHTML += `
+        <div style="background:#fff;border:1px solid var(--bdr);border-radius:var(--r);padding:1rem;text-align:center">
+          <div style="font-size:28px;margin-bottom:6px">${icon}</div>
+          <div style="font-size:13px;font-weight:500;color:var(--txt);margin-bottom:3px">${r.name}</div>
+          <div style="font-size:11px;color:var(--txs)">${r.location||'Damascus'}</div>
+        </div>`;
+    });
+  } catch(e) { console.error(e); }
+}
+
 async function loadHomeStats() {
   try {
     const { collection, getDocs } = window.fbFns;
@@ -955,6 +1022,7 @@ async function loadHomeStats() {
     document.getElementById('h-cust').textContent   = c.size;
     document.getElementById('h-stamps').textContent = a.size;
   } catch(e) {}
+  loadHomePartners();
 }
 
 function showErr(el, msg) {
