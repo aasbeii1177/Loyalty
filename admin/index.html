@@ -320,6 +320,13 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
       <div class="thead" style="grid-template-columns:2fr 1.5fr 1fr 1fr 1fr 180px"><div>Restaurant</div><div>Email</div><div>Type</div><div>Location</div><div>Status</div><div>Actions</div></div>
       <div id="rest-body"><div class="loading"><span class="spin"></span>Loading...</div></div>
     </div>
+
+    <!-- Performance comparison -->
+    <div class="table-card" style="margin-top:1.5rem">
+      <div class="table-top"><div class="table-title">📊 Restaurant performance</div></div>
+      <div class="thead" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr"><div>Restaurant</div><div>Type</div><div>Total scans</div><div>This month</div><div>Revenue (mo)</div></div>
+      <div id="perf-body"><div class="loading"><span class="spin"></span>Loading...</div></div>
+    </div>
   </div>
 
   <!-- ═══ DISCOUNT CODES TAB ═══ -->
@@ -439,7 +446,11 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
     <div class="table-card">
       <div class="table-top">
         <div class="table-title">All students</div>
-        <input class="search-input" type="text" placeholder="Search name or phone..." oninput="filterStudents(this.value)">
+        <div style="display:flex;gap:8px;align-items:center">
+          <span id="pending-count" style="font-size:12px;color:var(--txs)"></span>
+          <button id="btn-activate-all" onclick="activateAllPending()" style="display:none;background:var(--g);color:#fff;border:none;border-radius:var(--rs);padding:7px 14px;font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">✓ Activate all pending</button>
+          <input class="search-input" type="text" placeholder="Search name or phone..." oninput="filterStudents(this.value)">
+        </div>
       </div>
       <div class="thead" style="grid-template-columns:2fr 1.5fr 1.5fr 1fr 1fr 1fr 160px"><div>Name</div><div>Phone</div><div>University</div><div>Plan</div><div>Status</div><div>Points</div><div>Actions</div></div>
       <div id="student-body"><div class="loading"><span class="spin"></span>Loading...</div></div>
@@ -453,7 +464,7 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
         <div class="table-title">Loyalty card customers</div>
         <input class="search-input" type="text" placeholder="Search name or phone..." oninput="filterCustomers(this.value)">
       </div>
-      <div class="thead" style="grid-template-columns:2fr 1.5fr 1fr 1fr 1fr"><div>Name</div><div>Phone</div><div>Birthday</div><div>Tier</div><div>Points</div></div>
+      <div class="thead" style="grid-template-columns:2fr 1.5fr 1fr 1fr"><div>Name</div><div>Phone</div><div>Birthday</div><div>Points</div></div>
       <div id="cust-body"><div class="loading"><span class="spin"></span>Loading...</div></div>
     </div>
   </div>
@@ -619,6 +630,7 @@ async function loadAll() {
 
     // Render all tables
     renderRestaurants(allRestaurants);
+    loadPerformance(allRestaurants, actSnap);
     renderDiscounts(discSnap);
     renderUniversities(allUniversities);
     renderStudents(allStudents);
@@ -682,6 +694,46 @@ async function createRestaurant() {
     if (e.code === 'auth/email-already-in-use') msg = 'This email already has an account.';
     errEl.textContent = msg; errEl.classList.add('show');
   } finally { btn.disabled=false; btn.textContent='Create account'; }
+}
+
+function loadPerformance(restaurants, actSnap) {
+  const el        = document.getElementById('perf-body');
+  const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0);
+  const perfMap   = {};
+
+  actSnap.forEach(d => {
+    const data = d.data();
+    const rn   = data.restaurant;
+    if (!rn) return;
+    if (!perfMap[rn]) perfMap[rn] = { total:0, month:0, revenue:0 };
+    perfMap[rn].total++;
+    const ts = data.timestamp ? data.timestamp.seconds * 1000 : 0;
+    if (ts >= monthStart.getTime()) {
+      perfMap[rn].month++;
+      perfMap[rn].revenue += (data.billAmount || 0);
+    }
+  });
+
+  // Sort by total scans descending
+  const sorted = Object.entries(perfMap).sort((a,b) => b[1].total - a[1].total);
+  if (!sorted.length) { el.innerHTML='<div class="empty">No activity yet</div>'; return; }
+
+  const restMap = {};
+  restaurants.forEach(r => restMap[r.name] = r);
+
+  el.innerHTML = '';
+  sorted.forEach(([name, stats]) => {
+    const r   = restMap[name] || {};
+    const cat = getCategoryLabel(r.category);
+    el.innerHTML += `
+      <div class="trow" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr">
+        <div class="tname">${name}</div>
+        <div style="font-size:12px;color:var(--txs)">${cat}</div>
+        <div style="font-weight:500">${stats.total}</div>
+        <div style="color:var(--g);font-weight:500">${stats.month}</div>
+        <div style="color:var(--txs);font-size:12px">${stats.revenue.toLocaleString()} SYP</div>
+      </div>`;
+  });
 }
 
 function renderRestaurants(list) {
@@ -976,7 +1028,12 @@ async function bulkCreateStudents() {
 
 // ── STUDENTS ──
 function renderStudents(list) {
-  const el = document.getElementById('student-body');
+  const el      = document.getElementById('student-body');
+  const pending = list.filter(s => !s.activated);
+  const pendingCountEl = document.getElementById('pending-count');
+  const activateAllBtn = document.getElementById('btn-activate-all');
+  if (pendingCountEl) pendingCountEl.textContent = pending.length > 0 ? pending.length + ' pending activation' : '';
+  if (activateAllBtn) activateAllBtn.style.display = pending.length > 0 ? 'block' : 'none';
   if (!list.length) { el.innerHTML='<div class="empty">No students yet</div>'; return; }
   el.innerHTML='';
   list.forEach(s => {
@@ -1001,6 +1058,21 @@ function renderStudents(list) {
       </div>
     </div>`;
   });
+}
+
+async function activateAllPending() {
+  const pending = allStudents.filter(s => !s.activated);
+  if (!pending.length) return;
+  if (!confirm(`Activate all ${pending.length} pending students?`)) return;
+  const btn = document.getElementById('btn-activate-all');
+  btn.disabled = true; btn.textContent = 'Activating...';
+  try {
+    const { doc, updateDoc } = window.fbFns;
+    await Promise.all(pending.map(s => updateDoc(doc(window.db,'customers',s.id), { activated:true })));
+    toast(`✓ ${pending.length} students activated`);
+    loadAll();
+  } catch(e) { toast('Error: '+e.message, true); }
+  finally { btn.disabled=false; btn.textContent='✓ Activate all pending'; }
 }
 
 async function activateStudent(docId, name) {
@@ -1032,12 +1104,10 @@ function renderCustomers(list) {
   if (!list.length) { el.innerHTML='<div class="empty">No customers yet</div>'; return; }
   el.innerHTML='';
   list.forEach(c => {
-    const t = getTier(c.points||0);
-    el.innerHTML += `<div class="trow" style="grid-template-columns:2fr 1.5fr 1fr 1fr 1fr">
+    el.innerHTML += `<div class="trow" style="grid-template-columns:2fr 1.5fr 1fr 1fr">
       <div class="tname">${c.name}</div>
       <div style="color:var(--txs)">${c.phone}</div>
       <div style="color:var(--txs)">${c.birthday ? new Date(c.birthday).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '—'}</div>
-      <div><span class="tier-badge ${t.cls}">${t.lbl.replace(/[🥉🥈🥇] /,'')}</span></div>
       <div>${c.points||0}</div>
     </div>`;
   });
