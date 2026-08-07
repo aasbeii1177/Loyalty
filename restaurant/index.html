@@ -174,6 +174,9 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
 .analytics-sub{font-size:13px;color:var(--txs);margin-top:2px}
 .btn-export{background:var(--gd);color:#fff;border:none;border-radius:var(--rs);padding:9px 18px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .18s;display:flex;align-items:center;gap:6px}
 .btn-export:hover{background:var(--gm)}
+.date-filter-btn{padding:6px 12px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--bdr);background:var(--sfc);color:var(--txs);font-family:'DM Sans',sans-serif;transition:all .15s}
+.date-filter-btn:hover{border-color:var(--g);color:var(--g)}
+.date-filter-btn.active{background:var(--gd);border-color:var(--gd);color:#fff}
 .search-input{padding:8px 12px;border:1px solid var(--bdr);border-radius:var(--rs);font-size:13px;font-family:'DM Sans',sans-serif;outline:none;width:220px}
 .search-input:focus{border-color:var(--g)}
 .table-card{background:var(--w);border:1px solid var(--bdr);border-radius:var(--r);overflow:hidden;box-shadow:var(--sh)}
@@ -264,6 +267,10 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
         </div>
 
         <div class="cust-result" id="cust-result">
+          <!-- Birthday alert -->
+          <div id="birthday-alert" style="display:none;background:#fef3c7;border:1px solid #fde68a;border-radius:var(--rs);padding:10px 14px;margin-bottom:1rem;font-size:13px;color:#92400e;font-weight:500;text-align:center">
+            🎂 Today is <span id="bd-name">—</span>'s birthday! Offer them a birthday reward.
+          </div>
           <div class="cr-top">
             <div>
               <div class="cr-name" id="cr-name">—</div>
@@ -292,6 +299,7 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
       <div class="side-panel">
         <div class="mini-stat"><div class="ms-lbl">Scans today</div><div class="ms-val" id="stat-today">—</div></div>
         <div class="mini-stat"><div class="ms-lbl">Total scans</div><div class="ms-val" id="stat-total">—</div></div>
+        <div class="mini-stat"><div class="ms-lbl">Revenue this month</div><div class="ms-val" id="stat-revenue" style="font-size:16px">— SYP</div></div>
         <div class="recent-card">
           <div class="recent-title">Recent scans</div>
           <div id="recent-list"><div class="loading"><span class="spin"></span>Loading...</div></div>
@@ -307,7 +315,13 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
         <div class="analytics-title">Customer Database</div>
         <div class="analytics-sub">All customers who have visited your restaurant</div>
       </div>
-      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <!-- Date filter -->
+        <div style="display:flex;gap:4px">
+          <button class="date-filter-btn active" onclick="setDateFilter('all',this)">All time</button>
+          <button class="date-filter-btn" onclick="setDateFilter('month',this)">This month</button>
+          <button class="date-filter-btn" onclick="setDateFilter('week',this)">This week</button>
+        </div>
         <input class="search-input" type="text" placeholder="Search name or phone..." oninput="filterAnalytics(this.value)">
         <button class="btn-export" onclick="exportToExcel()">📥 Export to Excel</button>
       </div>
@@ -459,9 +473,22 @@ function renderResult(d) {
   const stamps = (typeof d.stamps === 'object' && d.stamps !== null) ? (d.stamps[rName] || 0) : 0;
 
   document.getElementById('cr-name').textContent     = d.name;
-  document.getElementById('cr-sub').textContent      = d.phone + ' · ' + getTier(d.points).lbl + (d.birthday ? ' · 🎂 ' + formatBirthday(d.birthday) : '');
+  document.getElementById('cr-sub').textContent      = d.phone + (d.birthday ? ' · 🎂 ' + formatBirthday(d.birthday) : '');
   document.getElementById('cr-pts').textContent      = (d.points||0) + ' pts';
   document.getElementById('cr-rest-name').textContent = rName;
+
+  // Birthday alert
+  const bdAlert = document.getElementById('birthday-alert');
+  const bdName  = document.getElementById('bd-name');
+  if (d.birthday) {
+    const bd    = new Date(d.birthday);
+    const today = new Date();
+    const isBd  = bd.getDate() === today.getDate() && bd.getMonth() === today.getMonth();
+    bdAlert.style.display = isBd ? 'block' : 'none';
+    if (isBd) bdName.textContent = d.name.split(' ')[0];
+  } else {
+    bdAlert.style.display = 'none';
+  }
 
   const el = document.getElementById('cr-stamps');
   el.innerHTML = '';
@@ -559,16 +586,46 @@ async function addStamp() {
 }
 
 // ── STATS & RECENT SCANS ──
+// ── DATE FILTER STATE ──
+let currentDateFilter = 'all';
+
+function setDateFilter(filter, el) {
+  currentDateFilter = filter;
+  document.querySelectorAll('.date-filter-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  loadAnalytics();
+}
+
+function getDateRange() {
+  const now   = new Date();
+  const start = new Date();
+  if (currentDateFilter === 'week') {
+    start.setDate(now.getDate() - 7);
+  } else if (currentDateFilter === 'month') {
+    start.setDate(1); start.setHours(0,0,0,0);
+  } else {
+    return null; // all time
+  }
+  return start.getTime();
+}
+
 async function loadStats() {
   try {
     const { collection, query, where, getDocs } = window.fbFns;
     const rn  = window.restaurantName || '';
     const all = await getDocs(query(collection(window.db,'activity'), where('restaurant','==',rn)));
     document.getElementById('stat-total').textContent = all.size;
-    const today = new Date(); today.setHours(0,0,0,0);
-    let cnt=0;
-    all.forEach(d => { const ts=d.data().timestamp; if(ts && ts.seconds*1000>=today.getTime()) cnt++; });
-    document.getElementById('stat-today').textContent = cnt;
+    const today     = new Date(); today.setHours(0,0,0,0);
+    const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0);
+    let todayCnt = 0; let monthRevenue = 0;
+    all.forEach(d => {
+      const data = d.data();
+      const ts   = data.timestamp ? data.timestamp.seconds * 1000 : 0;
+      if (ts >= today.getTime()) todayCnt++;
+      if (ts >= monthStart.getTime()) monthRevenue += (data.billAmount || 0);
+    });
+    document.getElementById('stat-today').textContent   = todayCnt;
+    document.getElementById('stat-revenue').textContent = monthRevenue.toLocaleString() + ' SYP';
   } catch(e) { console.error(e); }
 }
 
@@ -609,8 +666,12 @@ async function loadAnalytics() {
 
     // Aggregate by customer
     const customerMap = {};
+    // Apply date filter
+    const dateFrom = getDateRange();
     actSnap.forEach(d => {
       const data = d.data();
+      const ts   = data.timestamp ? data.timestamp.seconds * 1000 : 0;
+      if (dateFrom && ts < dateFrom) return; // skip if outside date range
       if (!customerMap[data.customerId]) {
         customerMap[data.customerId] = {
           id:       data.customerId,
