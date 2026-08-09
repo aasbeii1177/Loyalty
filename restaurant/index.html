@@ -458,9 +458,8 @@ function renderResult(d) {
   const rName  = window.restaurantName || 'Restaurant';
   const stamps = (typeof d.stamps === 'object' && d.stamps !== null) ? (d.stamps[rName] || 0) : 0;
 
-  document.getElementById('cr-name').textContent     = d.name;
-  document.getElementById('cr-sub').textContent      = d.phone + (d.birthday ? ' · 🎂 ' + formatBirthday(d.birthday) : '');
-  document.getElementById('cr-pts').textContent      = (d.points||0) + ' pts';
+  document.getElementById('cr-name').textContent      = d.name;
+  document.getElementById('cr-sub').textContent       = d.phone + (d.birthday ? ' · 🎂 ' + formatBirthday(d.birthday) : '');
   document.getElementById('cr-rest-name').textContent = rName;
 
   // Birthday alert
