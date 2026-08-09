@@ -276,21 +276,9 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
               <div class="cr-name" id="cr-name">—</div>
               <div class="cr-sub" id="cr-sub">—</div>
             </div>
-            <div class="cr-pts" id="cr-pts">0 pts</div>
           </div>
           <div class="cr-stamps-lbl">Stamp progress at <span id="cr-rest-name">your restaurant</span></div>
           <div class="cr-stamps" id="cr-stamps"></div>
-
-          <!-- Bill amount -->
-          <div class="bill-section">
-            <label class="bill-label">Enter bill amount — أدخل قيمة الفاتورة</label>
-            <div class="bill-row">
-              <input type="number" class="bill-input" id="bill-amount" placeholder="0" min="0" oninput="updatePointsPreview()">
-              <span class="bill-currency">SYP</span>
-            </div>
-            <div class="bill-pts" id="bill-pts-preview"></div>
-          </div>
-
           <button class="btn-stamp" id="btn-stamp" onclick="addStamp()">✓ Add stamp for this visit</button>
           <div class="stamp-done" id="stamp-done">✓ Stamp saved!</div>
         </div>
@@ -299,7 +287,6 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
       <div class="side-panel">
         <div class="mini-stat"><div class="ms-lbl">Scans today</div><div class="ms-val" id="stat-today">—</div></div>
         <div class="mini-stat"><div class="ms-lbl">Total scans</div><div class="ms-val" id="stat-total">—</div></div>
-        <div class="mini-stat"><div class="ms-lbl">Revenue this month</div><div class="ms-val" id="stat-revenue" style="font-size:16px">— SYP</div></div>
         <div class="recent-card">
           <div class="recent-title">Recent scans</div>
           <div id="recent-list"><div class="loading"><span class="spin"></span>Loading...</div></div>
@@ -359,9 +346,8 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
 <div class="toast" id="toast"></div>
 
 <script>
-let lookupData      = null;
-let allAnalytics    = [];
-const POINTS_PER_K  = 10; // 10 points per 1,000 SYP
+let lookupData   = null;
+let allAnalytics = [];
 
 // ── AUTH ──
 function showLogin() {
@@ -507,78 +493,52 @@ function renderResult(d) {
   document.getElementById('cust-result').classList.add('show');
 }
 
-function updatePointsPreview() {
-  const bill  = parseFloat(document.getElementById('bill-amount').value) || 0;
-  const pts   = Math.floor(bill / 1000) * POINTS_PER_K;
-  const el    = document.getElementById('bill-pts-preview');
-  el.textContent = bill > 0 ? `This visit earns +${pts} points` : '';
-}
-
 // ── ADD STAMP ──
 async function addStamp() {
   if (!lookupData) return;
-  const bill  = parseFloat(document.getElementById('bill-amount').value) || 0;
-  if (!bill || bill <= 0) { toast('Please enter the bill amount first', true); return; }
-
   const btn = document.getElementById('btn-stamp');
   btn.disabled=true; btn.textContent='Saving...';
-
   try {
     const { doc, updateDoc, collection, addDoc, serverTimestamp } = window.fbFns;
     const rName = window.restaurantName || 'Restaurant';
 
     // Get current stamps object
     const currentStamps = (typeof lookupData.stamps === 'object' && lookupData.stamps !== null)
-      ? { ...lookupData.stamps }
-      : {};
+      ? { ...lookupData.stamps } : {};
 
     // Increment this restaurant's stamp count
     const currentCount = currentStamps[rName] || 0;
     let   newCount     = currentCount + 1;
     const freeMeal     = newCount >= 9;
-    if (freeMeal) newCount = 0; // reset after free meal
-
+    if (freeMeal) newCount = 0;
     currentStamps[rName] = newCount;
 
-    // Calculate points from bill
-    const pointsEarned = Math.floor(bill / 1000) * POINTS_PER_K;
-    const newPoints    = (lookupData.points || 0) + pointsEarned;
-    const newTier      = getTier(newPoints).lbl.replace(/[🥉🥈🥇] /,'');
-
-    // Update customer document
+    // Update customer document — stamps only, no points
     await updateDoc(doc(window.db,'customers',lookupData.id), {
-      stamps: currentStamps,
-      points: newPoints,
-      tier: newTier
+      stamps: currentStamps
     });
 
     // Log activity
     await addDoc(collection(window.db,'activity'), {
-      customerId:      lookupData.id,
-      customerName:    lookupData.name,
-      customerPhone:   lookupData.phone,
+      customerId:       lookupData.id,
+      customerName:     lookupData.name,
+      customerPhone:    lookupData.phone,
       customerBirthday: lookupData.birthday || null,
-      cardId:          lookupData.cardId,
-      restaurant:      rName,
-      billAmount:      bill,
-      pointsAdded:     pointsEarned,
-      freeMealEarned:  freeMeal,
-      timestamp:       serverTimestamp()
+      cardId:           lookupData.cardId,
+      restaurant:       rName,
+      freeMealEarned:   freeMeal,
+      timestamp:        serverTimestamp()
     });
 
-    // Update local data
     lookupData.stamps = currentStamps;
-    lookupData.points = newPoints;
-
     const msg = freeMeal
-      ? `✓ Free meal earned! 🎉 Stamp card reset. +${pointsEarned} pts`
-      : `✓ Stamp saved! ${newCount}/9 at ${rName}. +${pointsEarned} pts`;
+      ? '✓ Free meal earned! 🎉 Stamp card reset.'
+      : '✓ Stamp saved! ' + newCount + '/9 at ' + rName;
     document.getElementById('stamp-done').textContent = msg;
     document.getElementById('stamp-done').classList.add('show');
     renderResult(lookupData);
-    toast('✓ Recorded in Firebase');
-    loadStats();
-    loadRecentScans();
+    toast('✓ Recorded');
+    loadStats(); loadRecentScans();
   } catch(e) {
     toast('Error: '+e.message, true);
     btn.disabled=false; btn.textContent='✓ Add stamp for this visit';
@@ -615,17 +575,13 @@ async function loadStats() {
     const rn  = window.restaurantName || '';
     const all = await getDocs(query(collection(window.db,'activity'), where('restaurant','==',rn)));
     document.getElementById('stat-total').textContent = all.size;
-    const today     = new Date(); today.setHours(0,0,0,0);
-    const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0);
-    let todayCnt = 0; let monthRevenue = 0;
+    const today = new Date(); today.setHours(0,0,0,0);
+    let todayCnt = 0;
     all.forEach(d => {
-      const data = d.data();
-      const ts   = data.timestamp ? data.timestamp.seconds * 1000 : 0;
-      if (ts >= today.getTime()) todayCnt++;
-      if (ts >= monthStart.getTime()) monthRevenue += (data.billAmount || 0);
+      const ts = d.data().timestamp;
+      if (ts && ts.seconds*1000 >= today.getTime()) todayCnt++;
     });
-    document.getElementById('stat-today').textContent   = todayCnt;
-    document.getElementById('stat-revenue').textContent = monthRevenue.toLocaleString() + ' SYP';
+    document.getElementById('stat-today').textContent = todayCnt;
   } catch(e) { console.error(e); }
 }
 
@@ -648,7 +604,7 @@ async function loadRecentScans() {
           <div class="scan-avatar">${initials}</div>
           <div>
             <div class="scan-name">${data.customerName}</div>
-            <div class="scan-bill">${bill ? bill + ' · ' : ''}+${data.pointsAdded||0} pts${data.freeMealEarned?' · 🎉 Free meal!':''}</div>
+            <div style="font-size:11px;color:var(--g)">${data.freeMealEarned ? '🎉 Free meal earned!' : 'Stamp added'}</div>
           </div>
           <div class="scan-time">${time}</div>
         </div>`;
