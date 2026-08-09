@@ -706,6 +706,14 @@ function renderCard(d) {
   renderRestaurantStamps(d.stamps || {});
   loadRestaurantCategories();
 
+  // Check for pending free meals — show modal for each one
+  const pending = d.freeMealPending || {};
+  const pendingRestaurants = Object.keys(pending).filter(r => pending[r] === true);
+  if (pendingRestaurants.length > 0) {
+    showFreeModal(pendingRestaurants[0]);
+    window.freeMealPendingRestaurant = pendingRestaurants[0];
+  }
+
   // Check if any restaurant has a free meal ready — show notification dot
   const stamps = d.stamps || {};
   const hasFree = Object.values(stamps).some(count => count >= 9);
@@ -1002,6 +1010,16 @@ function showFreeModal(restaurant) {
 }
 function closeFreeModal() {
   document.getElementById('free-meal-modal').style.display = 'none';
+  // Clear the pending flag in Firestore
+  if (window.freeMealPendingRestaurant && window.curDocId) {
+    const { doc, updateDoc } = window.fbFns;
+    const field = `freeMealPending.${window.freeMealPendingRestaurant}`;
+    const update = {};
+    update[field] = false;
+    updateDoc(doc(window.db, 'customers', window.curDocId), update)
+      .catch(e => console.error('Error clearing free meal:', e));
+    window.freeMealPendingRestaurant = null;
+  }
 }
 
 // ── PARTNER RESTAURANTS ON HOME ──
