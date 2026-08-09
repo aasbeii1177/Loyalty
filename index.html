@@ -370,8 +370,7 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
           <div class="dci" id="dc-info">—</div>
           <div class="dcqr"><div id="qrcode"></div></div>
           <div class="dcbt">
-            <div><div class="dcpl">Total Points</div><div class="dcpn" id="dc-pts">0</div></div>
-            <div style="text-align:right">
+            <div>
               <div class="dcpl">Card ID</div>
               <div style="font-size:13px;opacity:.7;font-family:monospace" id="dc-cardid">—</div>
             </div>
@@ -411,13 +410,11 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
           <div id="activity-list"><div class="loading">No activity yet</div></div>
         </div>
         <div class="panel">
-          <div class="panel-title">Your points</div>
-          <div style="font-family:'Playfair Display',serif;font-size:36px;color:var(--gd);margin-bottom:4px" id="pts-display">0</div>
-          <div style="font-size:12px;color:var(--txs);margin-bottom:1rem">points collected across all restaurants</div>
-          <div style="background:var(--gp);border-radius:var(--rs);padding:10px 14px;font-size:12px;color:var(--gd);line-height:1.55">
-            🎁 Points unlock exclusive rewards and benefits — stay tuned for our upcoming loyalty tiers!
+          <div class="panel-title">Account</div>
+          <div style="font-size:13px;color:var(--txs);margin-bottom:1rem;line-height:1.6">
+            Your WafaCard is active at all partner restaurants and shops in Damascus.
           </div>
-          <button class="switch-btn" onclick="showPage('editprofile')" style="margin-top:12px;margin-bottom:6px">✏️ Edit profile</button>
+          <button class="switch-btn" onclick="showPage('editprofile')" style="margin-bottom:6px">✏️ Edit profile</button>
           <button class="switch-btn" onclick="doLogout()">↩ Sign out / switch account</button>
         </div>
       </div>
@@ -688,9 +685,7 @@ function renderCard(d) {
   document.getElementById('card-greeting').textContent  = d.name.split(' ')[0] + "'s Card";
   document.getElementById('dc-name').textContent        = d.name;
   document.getElementById('dc-info').textContent        = d.phone + ' · 🎂 ' + bdDisplay;
-  document.getElementById('dc-pts').textContent         = d.points || 0;
   document.getElementById('dc-cardid').textContent      = cardId;
-  document.getElementById('pts-display').textContent    = d.points || 0;
 
   const joined = d.createdAt
     ? new Date(d.createdAt.seconds * 1000).toLocaleDateString('en-GB', { month:'short', year:'numeric' })
