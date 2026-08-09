@@ -8,7 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, addDoc, doc, getDoc, updateDoc, query, where, orderBy, limit, getDocs, serverTimestamp }
+  import { getFirestore, collection, addDoc, doc, getDoc, updateDoc, onSnapshot, query, where, orderBy, limit, getDocs, serverTimestamp }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged,
            updatePassword, reauthenticateWithCredential, EmailAuthProvider }
@@ -29,7 +29,7 @@
   window.db   = db;
   window.auth = auth;
   window.fbFns = {
-    collection, addDoc, doc, getDoc, updateDoc, query, where, orderBy, limit, getDocs, serverTimestamp,
+    collection, addDoc, doc, getDoc, updateDoc, onSnapshot, query, where, orderBy, limit, getDocs, serverTimestamp,
     createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut,
     updatePassword, reauthenticateWithCredential, EmailAuthProvider
   };
@@ -625,6 +625,8 @@ async function doLogin() {
 
 // ── LOGOUT ──
 async function doLogout() {
+  // Stop the real-time listener
+  if (cardUnsubscribe) { cardUnsubscribe(); cardUnsubscribe = null; }
   await window.fbFns.signOut(window.auth);
   window.curDocId    = null;
   window.curCardData = null;
@@ -633,24 +635,47 @@ async function doLogout() {
   toast('Signed out successfully');
 }
 
-// ── MY CARD ──
+// ── MY CARD — REAL-TIME LISTENER ──
+let cardUnsubscribe = null;
+
 function initMyCard() {
-  const user = window.currentUser;
   document.getElementById('mc-loading').style.display   = 'none';
   document.getElementById('mc-content').style.display   = 'none';
   document.getElementById('mc-loggedout').style.display = 'none';
 
-  if (!user) {
+  if (!window.currentUser) {
     document.getElementById('mc-loggedout').style.display = 'block';
     return;
   }
-  if (window.curCardData) {
-    renderCard(window.curCardData);
-    loadActivity();
+
+  // Already have a live listener running — just re-render current data
+  if (cardUnsubscribe) {
+    if (window.curCardData) {
+      renderCard(window.curCardData);
+      loadActivity();
+    }
     return;
   }
-  // Still loading
+
+  if (!window.curDocId) {
+    document.getElementById('mc-loggedout').style.display = 'block';
+    return;
+  }
+
   document.getElementById('mc-loading').style.display = 'block';
+
+  // Set up real-time Firestore listener
+  const { doc, onSnapshot } = window.fbFns;
+  cardUnsubscribe = onSnapshot(
+    doc(window.db, 'customers', window.curDocId),
+    (snap) => {
+      if (!snap.exists()) return;
+      window.curCardData = snap.data();
+      renderCard(window.curCardData);
+      loadActivity();
+    },
+    (err) => { console.error('Card listener error:', err); }
+  );
 }
 
 function renderCard(d) {
