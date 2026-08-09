@@ -510,10 +510,13 @@ async function addStamp() {
     if (freeMeal) newCount = 0;
     currentStamps[rName] = newCount;
 
-    // Update customer document — stamps only, no points
-    await updateDoc(doc(window.db,'customers',lookupData.id), {
-      stamps: currentStamps
-    });
+    // Update customer document — stamps only
+    const updateData = { stamps: currentStamps };
+    // If free meal earned, flag it so the customer sees it on their card
+    if (freeMeal) {
+      updateData[`freeMealPending.${rName}`] = true;
+    }
+    await updateDoc(doc(window.db,'customers',lookupData.id), updateData);
 
     // Log activity
     await addDoc(collection(window.db,'activity'), {
