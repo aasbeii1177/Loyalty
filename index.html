@@ -217,6 +217,7 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
     <button class="ntab active" onclick="showPage('home')">Home</button>
     <button class="ntab" onclick="showPage('signup')" id="nav-signup">Sign Up</button>
     <button class="ntab" onclick="showPage('mycard')" id="nav-mycard">My Card</button>
+    <button class="ntab" onclick="showPage('rewards')" id="nav-rewards" style="display:none">🎁 Rewards</button>
     <button class="ntab" onclick="showPage('editprofile')" id="nav-edit" style="display:none">Edit Profile</button>
     <div class="nav-user" id="nav-user" style="display:none">
       <div class="nav-user-dot"></div>
@@ -422,6 +423,30 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
   </div>
 </div>
 
+<!-- ═══ REWARDS ═══ -->
+<div id="page-rewards" class="page">
+  <div class="ptitle">My Rewards 🎁</div>
+  <div class="psub">Free rewards earned from your stamp cards</div>
+  <div id="rewards-loading" class="loading"><span class="spin"></span>Loading your rewards...</div>
+  <div id="rewards-content" style="display:none">
+    <!-- Unclaimed rewards -->
+    <div style="margin-bottom:1.5rem">
+      <div style="font-size:13px;font-weight:500;color:var(--txm);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">🎁 Ready to claim</div>
+      <div id="rewards-unclaimed"><div style="font-size:13px;color:var(--txs);padding:1rem;background:var(--w);border:1px solid var(--bdr);border-radius:var(--r)">No unclaimed rewards yet — keep collecting stamps!</div></div>
+    </div>
+    <!-- Redeemed rewards -->
+    <div>
+      <div style="font-size:13px;font-weight:500;color:var(--txm);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">✅ Redeemed</div>
+      <div id="rewards-redeemed"><div style="font-size:13px;color:var(--txs);padding:1rem;background:var(--w);border:1px solid var(--bdr);border-radius:var(--r)">No redeemed rewards yet</div></div>
+    </div>
+  </div>
+  <div id="rewards-loggedout" style="display:none;text-align:center;padding:3rem">
+    <div style="font-size:48px;margin-bottom:1rem">🎁</div>
+    <div style="font-family:'Playfair Display',serif;font-size:22px;margin-bottom:8px">Sign in to view your rewards</div>
+    <button class="btn-g" onclick="showPage('login')">Sign in →</button>
+  </div>
+</div>
+
 <!-- ═══ EDIT PROFILE ═══ -->
 <div id="page-editprofile" class="page">
   <div style="max-width:480px;margin:0 auto">
@@ -473,19 +498,6 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
   </div>
 </div>
 
-<!-- FREE MEAL MODAL -->
-<div id="free-meal-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:300;align-items:center;justify-content:center">
-  <div style="background:#fff;border-radius:20px;padding:2.5rem;max-width:360px;width:90%;text-align:center;box-shadow:var(--shl);animation:fu .4s ease">
-    <div style="font-size:64px;margin-bottom:1rem">🎉</div>
-    <div style="font-family:'Playfair Display',serif;font-size:24px;font-weight:500;margin-bottom:8px">Free meal earned!</div>
-    <div style="font-size:14px;color:var(--txs);margin-bottom:6px" id="free-meal-restaurant">—</div>
-    <div style="font-size:13px;color:var(--txs);margin-bottom:1.5rem;line-height:1.6">Show your QR code to the restaurant to claim your free meal. Your stamp card has been reset.</div>
-    <button onclick="closeFreeModal()" style="background:var(--gd);color:#fff;border:none;border-radius:var(--rs);padding:12px 28px;font-size:14px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
-      Got it! 🎊
-    </button>
-  </div>
-</div>
-
 <div class="toast" id="toast"></div>
 
 <script>
@@ -494,19 +506,21 @@ function showPage(id) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.ntab').forEach(t => t.classList.remove('active'));
   document.getElementById('page-' + id).classList.add('active');
-  const map = ['home','signup','login','mycard','editprofile'];
+  const map = ['home','signup','login','mycard','rewards','editprofile'];
   const idx = map.indexOf(id);
   const navIdx = id === 'login' ? 1 : idx;
   if (navIdx >= 0) document.querySelectorAll('.ntab')[navIdx]?.classList.add('active');
   if (id === 'mycard')      initMyCard();
   if (id === 'home')        loadHomeStats();
   if (id === 'editprofile') initEditProfile();
+  if (id === 'rewards')     loadRewards();
   window.scrollTo(0, 0);
 }
 
 // ── NAV UI based on auth state ──
 function updateNavForAuth(loggedIn) {
   document.getElementById('nav-signup').style.display  = loggedIn ? 'none'  : 'block';
+  document.getElementById('nav-rewards').style.display  = loggedIn ? 'block' : 'none';
   document.getElementById('nav-edit').style.display    = loggedIn ? 'block' : 'none';
   document.getElementById('nav-user').style.display    = loggedIn ? 'flex'  : 'none';
   document.getElementById('nav-logout').style.display  = loggedIn ? 'block' : 'none';
@@ -706,20 +720,12 @@ function renderCard(d) {
   renderRestaurantStamps(d.stamps || {});
   loadRestaurantCategories();
 
-  // Check for pending free meals — show modal for each one
-  const pending = d.freeMealPending || {};
-  const pendingRestaurants = Object.keys(pending).filter(r => pending[r] === true);
-  if (pendingRestaurants.length > 0) {
-    showFreeModal(pendingRestaurants[0]);
-    window.freeMealPendingRestaurant = pendingRestaurants[0];
-  }
-
-  // Check if any restaurant has a free meal ready — show notification dot
-  const stamps = d.stamps || {};
-  const hasFree = Object.values(stamps).some(count => count >= 9);
-  const navMycard = document.querySelectorAll('.ntab')[2];
-  if (navMycard) {
-    navMycard.innerHTML = hasFree ? 'My Card <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#f59e0b;vertical-align:2px;margin-left:2px"></span>' : 'My Card';
+  // Check if any restaurant has unclaimed reward — show notification dot on Rewards tab
+  const navRewards = document.getElementById('nav-rewards');
+  if (navRewards) {
+    checkHasUnclaimedRewards().then(has => {
+      navRewards.innerHTML = has ? '🎁 Rewards <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#f59e0b;vertical-align:2px;margin-left:2px"></span>' : '🎁 Rewards';
+    });
   }
 
   // Update nav
@@ -814,27 +820,26 @@ function renderStampRows(entries) {
     el.innerHTML = '<div style="font-size:13px;color:var(--txs);padding:8px 0">No restaurants found</div>';
     return;
   }
-
+  const thresholds = (window.curCardData && window.curCardData.stampThresholds) || {};
   el.innerHTML = '';
-  let freeMealRestaurant = null;
   entries.forEach(([restaurant, count], index) => {
-    const remaining = 9 - count;
-    const isFree    = count >= 9;
-    if (isFree && !freeMealRestaurant) freeMealRestaurant = restaurant;
+    const threshold = thresholds[restaurant] || 9;
+    const remaining = threshold - count;
+    const isFree    = count >= threshold;
     const note      = isFree
-      ? '🎉 Free meal earned! Show your card to the restaurant.'
-      : remaining + ' more stamp' + (remaining === 1 ? '' : 's') + ' for a free meal' + (remaining === 1 ? ' 🔥' : '');
+      ? '🎉 Free reward earned! Visit the restaurant to claim it.'
+      : remaining + ' more stamp' + (remaining === 1 ? '' : 's') + ' for a free reward' + (remaining === 1 ? ' 🔥' : '');
 
-    // Mini dot row for collapsed view
+    // Mini dot row
     let miniDots = '';
-    for (let i = 1; i <= 9; i++) {
+    for (let i = 1; i <= threshold; i++) {
       const cls = i <= count ? (isFree ? 'rest-dot free' : 'rest-dot filled') : 'rest-dot';
       miniDots += `<div class="${cls}"></div>`;
     }
 
-    // Full stamp row for expanded view
+    // Full stamp row
     let stampsHtml = '';
-    for (let i = 1; i <= 9; i++) {
+    for (let i = 1; i <= threshold; i++) {
       stampsHtml += `<div class="stc${i <= count ? ' earned' : ''}">${i <= count ? '✓' : i}</div>`;
     }
 
@@ -844,7 +849,7 @@ function renderStampRows(entries) {
         <div class="rest-row-header" onclick="toggleStampRow('${rowId}')">
           <div>
             <div class="rest-row-name">${restaurant}</div>
-            <div style="font-size:11px;color:${isFree ? '#f59e0b' : 'var(--txs)'};margin-top:2px">${isFree ? '🎉 Free meal ready!' : count + '/9 stamps'}</div>
+            <div style="font-size:11px;color:${isFree ? '#f59e0b' : 'var(--txs)'};margin-top:2px">${isFree ? '🎉 Reward ready to claim!' : count + '/' + threshold + ' stamps'}</div>
           </div>
           <div class="rest-row-meta">
             <div class="rest-row-mini">${miniDots}</div>
@@ -1002,26 +1007,70 @@ function getTier(pts) {
   return                         { lbl: '🥉 Bronze' };
 }
 
-// ── FREE MEAL MODAL ──
-function showFreeModal(restaurant) {
-  document.getElementById('free-meal-restaurant').textContent = '🏆 ' + restaurant + ' — stamp card completed!';
-  const modal = document.getElementById('free-meal-modal');
-  modal.style.display = 'flex';
+// ── REWARDS ──
+async function checkHasUnclaimedRewards() {
+  if (!window.curDocId) return false;
+  try {
+    const { collection, query, where, getDocs } = window.fbFns;
+    const q    = query(collection(window.db,'rewards'), where('customerId','==',window.curDocId), where('redeemed','==',false));
+    const snap = await getDocs(q);
+    return !snap.empty;
+  } catch(e) { return false; }
 }
-function closeFreeModal() {
-  document.getElementById('free-meal-modal').style.display = 'none';
-  // Clear the pending flag in Firestore
-  if (window.freeMealPendingRestaurant && window.curDocId) {
-    const { doc, updateDoc } = window.fbFns;
-    const field = `freeMealPending.${window.freeMealPendingRestaurant}`;
-    const update = {};
-    update[field] = false;
-    updateDoc(doc(window.db, 'customers', window.curDocId), update)
-      .catch(e => console.error('Error clearing free meal:', e));
-    window.freeMealPendingRestaurant = null;
+
+async function loadRewards() {
+  if (!window.currentUser || !window.curDocId) {
+    document.getElementById('rewards-loading').style.display  = 'none';
+    document.getElementById('rewards-content').style.display  = 'none';
+    document.getElementById('rewards-loggedout').style.display = 'block';
+    return;
+  }
+  document.getElementById('rewards-loading').style.display   = 'block';
+  document.getElementById('rewards-content').style.display   = 'none';
+  document.getElementById('rewards-loggedout').style.display = 'none';
+  try {
+    const { collection, query, where, orderBy, getDocs } = window.fbFns;
+    const q    = query(collection(window.db,'rewards'), where('customerId','==',window.curDocId), orderBy('earnedAt','desc'));
+    const snap = await getDocs(q);
+    document.getElementById('rewards-loading').style.display = 'none';
+    document.getElementById('rewards-content').style.display = 'block';
+    const unclaimed = [];
+    const redeemed  = [];
+    snap.forEach(d => {
+      const r = { id: d.id, ...d.data() };
+      if (r.redeemed) redeemed.push(r); else unclaimed.push(r);
+    });
+    renderRewardsList('rewards-unclaimed', unclaimed, false);
+    renderRewardsList('rewards-redeemed',  redeemed,  true);
+  } catch(e) {
+    document.getElementById('rewards-loading').style.display = 'none';
+    document.getElementById('rewards-content').style.display = 'block';
+    console.error(e);
   }
 }
 
+function renderRewardsList(elId, list, isRedeemed) {
+  const el = document.getElementById(elId);
+  if (!list.length) {
+    el.innerHTML = `<div style="font-size:13px;color:var(--txs);padding:1rem;background:var(--w);border:1px solid var(--bdr);border-radius:var(--r)">${isRedeemed ? 'No redeemed rewards yet' : 'No unclaimed rewards yet — keep collecting stamps!'}</div>`;
+    return;
+  }
+  el.innerHTML = '';
+  list.forEach(r => {
+    const earned   = r.earnedAt   ? new Date(r.earnedAt.seconds*1000).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '—';
+    const redeemed = r.redeemedAt ? new Date(r.redeemedAt.seconds*1000).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : null;
+    el.innerHTML += `
+      <div style="background:var(--w);border:1px solid ${isRedeemed ? 'var(--bdr)' : '#86efac'};border-radius:var(--r);padding:1.25rem;margin-bottom:8px;display:flex;align-items:center;gap:1rem">
+        <div style="font-size:36px;flex-shrink:0">${isRedeemed ? '✅' : '🎁'}</div>
+        <div style="flex:1">
+          <div style="font-size:14px;font-weight:500;color:var(--txt);margin-bottom:3px">${r.rewardDescription || 'Free item'}</div>
+          <div style="font-size:12px;color:var(--txs);margin-bottom:2px">📍 ${r.restaurant}</div>
+          <div style="font-size:11px;color:var(--txs)">Earned: ${earned}${redeemed ? ' · Redeemed: ' + redeemed : ''}</div>
+        </div>
+        ${!isRedeemed ? `<div style="background:#dcfce7;color:#166534;border-radius:20px;padding:4px 12px;font-size:11px;font-weight:500;white-space:nowrap">Ready to claim</div>` : ''}
+      </div>`;
+  });
+}
 // ── PARTNER RESTAURANTS ON HOME ──
 async function loadHomePartners() {
   try {
