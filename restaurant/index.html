@@ -47,10 +47,12 @@
             showErr(document.getElementById('li-err'), 'Your account has been disabled. Contact WafaCard support.');
             return;
           }
-          window.restaurantName  = data.name;
-          window.restaurantDocId = snap.docs[0].id;
+          window.restaurantName        = data.name;
+          window.restaurantDocId       = snap.docs[0].id;
+          window.restaurantThreshold   = data.stampThreshold || 9;
+          window.restaurantReward      = data.rewardDescription || 'Free item';
           document.getElementById('r-name').textContent = data.name;
-          document.getElementById('r-meta').textContent = 'Damascus · WafaCard Partner';
+          document.getElementById('r-meta').textContent = `Damascus · ${window.restaurantThreshold} stamps = ${window.restaurantReward}`;
         }
       } catch(e) { console.error(e); }
       showPortal();
@@ -271,13 +273,19 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
           <div id="birthday-alert" style="display:none;background:#fef3c7;border:1px solid #fde68a;border-radius:var(--rs);padding:10px 14px;margin-bottom:1rem;font-size:13px;color:#92400e;font-weight:500;text-align:center">
             🎂 Today is <span id="bd-name">—</span>'s birthday! Offer them a birthday reward.
           </div>
+          <!-- Unclaimed reward alert -->
+          <div id="reward-alert" style="display:none;background:#f0fdf4;border:1px solid #86efac;border-radius:var(--rs);padding:12px 14px;margin-bottom:1rem">
+            <div style="font-size:13px;font-weight:500;color:#166534;margin-bottom:8px">🎁 This customer has an unclaimed reward here!</div>
+            <div style="font-size:12px;color:#15803d;margin-bottom:10px" id="reward-desc">—</div>
+            <button onclick="redeemReward()" style="width:100%;background:#16a34a;color:#fff;border:none;border-radius:var(--rs);padding:10px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">✓ Redeem reward</button>
+          </div>
           <div class="cr-top">
             <div>
               <div class="cr-name" id="cr-name">—</div>
               <div class="cr-sub" id="cr-sub">—</div>
             </div>
           </div>
-          <div class="cr-stamps-lbl">Stamp progress at <span id="cr-rest-name">your restaurant</span></div>
+          <div class="cr-stamps-lbl">Stamp progress at <span id="cr-rest-name">your restaurant</span> (<span id="cr-threshold">9</span> for a free reward)</div>
           <div class="cr-stamps" id="cr-stamps"></div>
           <button class="btn-stamp" id="btn-stamp" onclick="addStamp()">✓ Add stamp for this visit</button>
           <div class="stamp-done" id="stamp-done">✓ Stamp saved!</div>
@@ -455,29 +463,35 @@ async function lookupCustomer() {
 }
 
 function renderResult(d) {
-  const rName  = window.restaurantName || 'Restaurant';
-  const stamps = (typeof d.stamps === 'object' && d.stamps !== null) ? (d.stamps[rName] || 0) : 0;
+  const rName     = window.restaurantName || 'Restaurant';
+  const threshold = window.restaurantThreshold || 9;
+  const stampsObj = (typeof d.stamps === 'object' && d.stamps !== null) ? d.stamps : {};
+  const stamps    = stampsObj[rName] || 0;
 
-  document.getElementById('cr-name').textContent      = d.name;
-  document.getElementById('cr-sub').textContent       = d.phone + (d.birthday ? ' · 🎂 ' + formatBirthday(d.birthday) : '');
-  document.getElementById('cr-rest-name').textContent = rName;
+  document.getElementById('cr-name').textContent       = d.name;
+  document.getElementById('cr-sub').textContent        = d.phone + (d.birthday ? ' · 🎂 ' + formatBirthday(d.birthday) : '');
+  document.getElementById('cr-rest-name').textContent  = rName;
+  document.getElementById('cr-threshold').textContent  = threshold;
 
   // Birthday alert
   const bdAlert = document.getElementById('birthday-alert');
-  const bdName  = document.getElementById('bd-name');
   if (d.birthday) {
     const bd    = new Date(d.birthday);
     const today = new Date();
     const isBd  = bd.getDate() === today.getDate() && bd.getMonth() === today.getMonth();
     bdAlert.style.display = isBd ? 'block' : 'none';
-    if (isBd) bdName.textContent = d.name.split(' ')[0];
+    if (isBd) document.getElementById('bd-name').textContent = d.name.split(' ')[0];
   } else {
     bdAlert.style.display = 'none';
   }
 
+  // Check for unclaimed reward at this restaurant
+  checkUnclaimedReward(d);
+
+  // Draw stamps
   const el = document.getElementById('cr-stamps');
   el.innerHTML = '';
-  for (let i = 1; i <= 9; i++) {
+  for (let i = 1; i <= threshold; i++) {
     const s = document.createElement('div');
     s.className = 'cr-stamp' + (i <= stamps ? ' done' : '');
     s.textContent = i <= stamps ? '✓' : '';
@@ -490,6 +504,54 @@ function renderResult(d) {
   document.getElementById('cust-result').classList.add('show');
 }
 
+// ── CHECK UNCLAIMED REWARD ──
+let currentRewardDocId = null;
+
+async function checkUnclaimedReward(d) {
+  const rewardAlert = document.getElementById('reward-alert');
+  const rewardDesc  = document.getElementById('reward-desc');
+  currentRewardDocId = null;
+  rewardAlert.style.display = 'none';
+  try {
+    const { collection, query, where, getDocs } = window.fbFns;
+    const rName = window.restaurantName || 'Restaurant';
+    const q     = query(
+      collection(window.db, 'rewards'),
+      where('customerId', '==', d.id || lookupData?.id),
+      where('restaurant', '==', rName),
+      where('redeemed', '==', false)
+    );
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      currentRewardDocId = snap.docs[0].id;
+      const reward = snap.docs[0].data();
+      const earned = reward.earnedAt ? new Date(reward.earnedAt.seconds*1000).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '—';
+      rewardDesc.textContent  = `${window.restaurantReward || 'Free item'} — earned on ${earned}`;
+      rewardAlert.style.display = 'block';
+    }
+  } catch(e) { console.error(e); }
+}
+
+// ── REDEEM REWARD ──
+async function redeemReward() {
+  if (!currentRewardDocId) return;
+  const btn = document.querySelector('#reward-alert button');
+  btn.disabled = true; btn.textContent = 'Redeeming...';
+  try {
+    const { doc, updateDoc, serverTimestamp } = window.fbFns;
+    await updateDoc(doc(window.db, 'rewards', currentRewardDocId), {
+      redeemed:   true,
+      redeemedAt: serverTimestamp()
+    });
+    document.getElementById('reward-alert').style.display = 'none';
+    currentRewardDocId = null;
+    toast('✓ Reward redeemed successfully!');
+  } catch(e) {
+    toast('Error: ' + e.message, true);
+    btn.disabled = false; btn.textContent = '✓ Redeem reward';
+  }
+}
+
 // ── ADD STAMP ──
 async function addStamp() {
   if (!lookupData) return;
@@ -497,7 +559,8 @@ async function addStamp() {
   btn.disabled=true; btn.textContent='Saving...';
   try {
     const { doc, updateDoc, collection, addDoc, serverTimestamp } = window.fbFns;
-    const rName = window.restaurantName || 'Restaurant';
+    const rName     = window.restaurantName || 'Restaurant';
+    const threshold = window.restaurantThreshold || 9;
 
     // Get current stamps object
     const currentStamps = (typeof lookupData.stamps === 'object' && lookupData.stamps !== null)
@@ -506,17 +569,34 @@ async function addStamp() {
     // Increment this restaurant's stamp count
     const currentCount = currentStamps[rName] || 0;
     let   newCount     = currentCount + 1;
-    const freeMeal     = newCount >= 9;
+    const freeMeal     = newCount >= threshold;
     if (freeMeal) newCount = 0;
     currentStamps[rName] = newCount;
 
-    // Update customer document — stamps only
-    const updateData = { stamps: currentStamps };
-    // If free meal earned, flag it so the customer sees it on their card
+    // Store threshold per restaurant so customer card knows how many circles to show
+    const thresholds = lookupData.stampThresholds || {};
+    thresholds[rName] = threshold;
+
+    // Update customer document
+    await updateDoc(doc(window.db,'customers',lookupData.id), {
+      stamps:          currentStamps,
+      stampThresholds: thresholds
+    });
+
+    // If free meal earned — create a reward document
     if (freeMeal) {
-      updateData[`freeMealPending.${rName}`] = true;
+      await addDoc(collection(window.db, 'rewards'), {
+        customerId:        lookupData.id,
+        customerName:      lookupData.name,
+        customerPhone:     lookupData.phone,
+        cardId:            lookupData.cardId,
+        restaurant:        rName,
+        rewardDescription: window.restaurantReward || 'Free item',
+        redeemed:          false,
+        redeemedAt:        null,
+        earnedAt:          serverTimestamp()
+      });
     }
-    await updateDoc(doc(window.db,'customers',lookupData.id), updateData);
 
     // Log activity
     await addDoc(collection(window.db,'activity'), {
@@ -532,12 +612,12 @@ async function addStamp() {
 
     lookupData.stamps = currentStamps;
     const msg = freeMeal
-      ? '✓ Free meal earned! 🎉 Stamp card reset.'
-      : '✓ Stamp saved! ' + newCount + '/9 at ' + rName;
+      ? `✓ 🎉 Free reward earned! A reward has been added to ${lookupData.name}'s card.`
+      : `✓ Stamp saved! ${newCount}/${threshold} at ${rName}`;
     document.getElementById('stamp-done').textContent = msg;
     document.getElementById('stamp-done').classList.add('show');
     renderResult(lookupData);
-    toast('✓ Recorded');
+    toast(freeMeal ? '🎉 Reward created!' : '✓ Stamp recorded');
     loadStats(); loadRecentScans();
   } catch(e) {
     toast('Error: '+e.message, true);
