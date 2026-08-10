@@ -312,12 +312,23 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
           <input type="text" id="cr-location" placeholder="e.g. Mazzeh · Old City">
         </div>
       </div>
+      <div class="form-row cols2" style="margin-bottom:10px">
+        <div class="fg fg-inline">
+          <label>Stamps required for free reward</label>
+          <input type="number" id="cr-threshold" placeholder="9" min="3" max="20" value="9">
+          <div class="hint">How many stamps before the customer earns a free reward</div>
+        </div>
+        <div class="fg fg-inline">
+          <label>Free reward description <span style="font-weight:400;color:var(--txs)">(optional)</span></label>
+          <input type="text" id="cr-reward" placeholder="e.g. Free shawarma, Free coffee">
+        </div>
+      </div>
       <div class="err-msg" id="cr-err">—</div>
       <div class="suc-msg" id="cr-suc">—</div>
     </div>
     <div class="table-card">
       <div class="table-top"><div class="table-title">All partner restaurants</div></div>
-      <div class="thead" style="grid-template-columns:2fr 1.5fr 1fr 1fr 1fr 180px"><div>Restaurant</div><div>Email</div><div>Type</div><div>Location</div><div>Status</div><div>Actions</div></div>
+      <div class="thead" style="grid-template-columns:2fr 1.5fr 1fr 1fr 1fr 1fr 180px"><div>Restaurant</div><div>Email</div><div>Type</div><div>Location</div><div>Stamps</div><div>Status</div><div>Actions</div></div>
       <div id="rest-body"><div class="loading"><span class="spin"></span>Loading...</div></div>
     </div>
 
@@ -659,13 +670,15 @@ async function loadAll() {
 
 // ── RESTAURANTS ──
 async function createRestaurant() {
-  const name     = document.getElementById('cr-name').value.trim();
-  const email    = document.getElementById('cr-email').value.trim();
-  const pw       = document.getElementById('cr-pw').value.trim();
-  const category = document.getElementById('cr-category').value;
-  const location = document.getElementById('cr-location').value.trim();
-  const errEl    = document.getElementById('cr-err');
-  const sucEl    = document.getElementById('cr-suc');
+  const name      = document.getElementById('cr-name').value.trim();
+  const email     = document.getElementById('cr-email').value.trim();
+  const pw        = document.getElementById('cr-pw').value.trim();
+  const category  = document.getElementById('cr-category').value;
+  const location  = document.getElementById('cr-location').value.trim();
+  const threshold = parseInt(document.getElementById('cr-threshold').value) || 9;
+  const reward    = document.getElementById('cr-reward').value.trim();
+  const errEl     = document.getElementById('cr-err');
+  const sucEl     = document.getElementById('cr-suc');
   errEl.classList.remove('show'); sucEl.classList.remove('show');
   if (!name || !email || !pw)  { errEl.textContent='Fill name, email and password'; errEl.classList.add('show'); return; }
   if (!category)               { errEl.textContent='Select a category type'; errEl.classList.add('show'); return; }
@@ -678,15 +691,19 @@ async function createRestaurant() {
     await addDoc(collection(window.db,'restaurants'), {
       uid: cred.user.uid, name, email,
       category, location: location || null,
+      stampThreshold: threshold,
+      rewardDescription: reward || 'Free item',
       disabled: false, createdAt: serverTimestamp()
     });
-    sucEl.textContent = `✓ Created "${name}" (${category}) — Email: ${email} · Password: ${pw}`;
+    sucEl.textContent = `✓ Created "${name}" — ${threshold} stamps for a reward — Email: ${email} · Password: ${pw}`;
     sucEl.classList.add('show');
-    document.getElementById('cr-name').value     = '';
-    document.getElementById('cr-email').value    = '';
-    document.getElementById('cr-pw').value       = '';
-    document.getElementById('cr-category').value = '';
-    document.getElementById('cr-location').value = '';
+    document.getElementById('cr-name').value      = '';
+    document.getElementById('cr-email').value     = '';
+    document.getElementById('cr-pw').value        = '';
+    document.getElementById('cr-category').value  = '';
+    document.getElementById('cr-location').value  = '';
+    document.getElementById('cr-threshold').value = '9';
+    document.getElementById('cr-reward').value    = '';
     toast('✓ Restaurant account created');
     loadAll();
   } catch(e) {
@@ -748,11 +765,12 @@ function renderRestaurants(list) {
       ? `<button class="btn-sm btn-enable" onclick="toggleRestaurant('${r.id}',true,'${r.name}')">Enable</button>`
       : `<button class="btn-sm btn-disable" onclick="toggleRestaurant('${r.id}',false,'${r.name}')">Disable</button>`;
     const catLabel = getCategoryLabel(r.category);
-    el.innerHTML += `<div class="trow" style="grid-template-columns:2fr 1.5fr 1fr 1fr 1fr 180px">
+    el.innerHTML += `<div class="trow" style="grid-template-columns:2fr 1.5fr 1fr 1fr 1fr 1fr 180px">
       <div class="tname">${r.name}</div>
       <div style="color:var(--txs);font-size:12px">${r.email}</div>
       <div style="font-size:12px">${catLabel}</div>
       <div style="color:var(--txs);font-size:12px">${r.location||'—'}</div>
+      <div style="font-size:12px;font-weight:500">${r.stampThreshold||9} stamps</div>
       <div>${badge}</div>
       <div class="action-btns">${toggleBtn}<button class="btn-sm btn-delete" onclick="confirmDeleteRestaurant('${r.id}','${r.name}')">Delete</button></div>
     </div>`;
