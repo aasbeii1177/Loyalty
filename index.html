@@ -8,7 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, addDoc, doc, getDoc, updateDoc, onSnapshot, query, where, orderBy, limit, getDocs, serverTimestamp }
+  import { getFirestore, collection, addDoc, doc, getDoc, updateDoc, onSnapshot, increment, query, where, orderBy, limit, getDocs, serverTimestamp }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged,
            updatePassword, reauthenticateWithCredential, EmailAuthProvider }
@@ -29,7 +29,7 @@
   window.db   = db;
   window.auth = auth;
   window.fbFns = {
-    collection, addDoc, doc, getDoc, updateDoc, onSnapshot, query, where, orderBy, limit, getDocs, serverTimestamp,
+    collection, addDoc, doc, getDoc, updateDoc, onSnapshot, increment, query, where, orderBy, limit, getDocs, serverTimestamp,
     createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut,
     updatePassword, reauthenticateWithCredential, EmailAuthProvider
   };
@@ -38,22 +38,18 @@
   onAuthStateChanged(auth, async (user) => {
     window.currentUser = user;
     if (user) {
-      // Load their Firestore card document
       try {
         const { collection, query, where, getDocs } = window.fbFns;
         const q    = query(collection(db, 'customers'), where('uid', '==', user.uid));
         const snap = await getDocs(q);
         if (!snap.empty) {
-          window.curDocId   = snap.docs[0].id;
+          window.curDocId    = snap.docs[0].id;
           window.curCardData = snap.docs[0].data();
         }
       } catch(e) { console.error(e); }
-      // If currently on mycard page, render it
-      if (document.getElementById('page-mycard').classList.contains('active')) {
-        renderCard(window.curCardData);
-        loadActivity();
-      }
       updateNavForAuth(true);
+      // Always send logged-in users straight to their card
+      showPage('mycard');
     } else {
       window.curDocId    = null;
       window.curCardData = null;
@@ -61,7 +57,7 @@
     }
   });
 
-  window.addEventListener('load', loadHomeStats);
+  window.addEventListener('load', loadHomePartners);
 </script>
 <style>
 :root{--gd:#064e3b;--gm:#065f46;--g:#059669;--gl:#d1fae5;--gp:#ecfdf5;--txt:#111827;--txm:#374151;--txs:#6b7280;--bdr:#e5e7eb;--sfc:#f9fafb;--w:#ffffff;--r:14px;--rs:8px;--sh:0 4px 24px rgba(0,0,0,.08);--shl:0 12px 48px rgba(0,0,0,.14)}
@@ -214,9 +210,10 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
     <div class="logo-text">Wafa<span>Card</span></div>
   </div>
   <div class="ntabs">
-    <button class="ntab active" onclick="showPage('home')">Home</button>
+    <button class="ntab active" onclick="showPage('home')" id="nav-home">Home</button>
     <button class="ntab" onclick="showPage('signup')" id="nav-signup">Sign Up</button>
-    <button class="ntab" onclick="showPage('mycard')" id="nav-mycard">My Card</button>
+    <button class="ntab" onclick="showPage('login')" id="nav-login-btn">Sign In</button>
+    <button class="ntab" onclick="showPage('mycard')" id="nav-mycard" style="display:none">My Card</button>
     <button class="ntab" onclick="showPage('rewards')" id="nav-rewards" style="display:none">🎁 Rewards</button>
     <button class="ntab" onclick="showPage('editprofile')" id="nav-edit" style="display:none">Edit Profile</button>
     <div class="nav-user" id="nav-user" style="display:none">
@@ -229,32 +226,65 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
 
 <!-- ═══ HOME ═══ -->
 <div id="page-home" class="page active">
-  <div class="hero">
-    <div class="hero-badge">🇸🇾 Damascus · دمشق</div>
-    <div class="hero-title">Loyalty that <span>rewards</span> every visit</div>
-    <div class="hero-sub">One card, every restaurant in Damascus. Earn points, collect stamps, unlock rewards — all digital, all instant.</div>
-    <div class="hero-cta">
-      <button class="btn-g" id="home-cta" onclick="showPage('signup')">Get your free card →</button>
-      <button class="btn-o" onclick="window.location.href='restaurant/index.html'">I'm a restaurant owner</button>
+
+  <!-- Full-screen hero -->
+  <div style="min-height:calc(100vh - 64px);display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:2rem;background:#fff;margin:-2rem;margin-bottom:0">
+
+    <!-- Logo mark large -->
+    <div style="width:72px;height:72px;background:var(--gd);border-radius:18px;display:flex;align-items:center;justify-content:center;margin-bottom:2rem;box-shadow:0 8px 32px rgba(6,78,59,.25)">
+      <span style="font-family:'Playfair Display',serif;font-size:34px;color:#fff;font-weight:600">و</span>
+    </div>
+
+    <!-- Headline -->
+    <div style="font-family:'Playfair Display',serif;font-size:clamp(32px,5vw,56px);font-weight:500;color:var(--gd);line-height:1.1;margin-bottom:1.25rem;max-width:560px">
+      Every visit<br><em style="color:var(--g);font-style:normal">rewarded</em>
+    </div>
+
+    <!-- Sub -->
+    <div style="font-size:16px;color:var(--txs);max-width:380px;line-height:1.75;margin-bottom:2.5rem">
+      Collect stamps at your favourite restaurants and shops in Damascus. Free rewards, no app needed.
+    </div>
+
+    <!-- CTAs -->
+    <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:4rem">
+      <button class="btn-g" onclick="showPage('signup')" style="padding:14px 32px;font-size:15px;border-radius:30px">Get your free card</button>
+      <button onclick="showPage('login')" style="background:none;border:1.5px solid var(--bdr);border-radius:30px;padding:14px 28px;font-size:15px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;color:var(--txm);transition:all .18s" onmouseover="this.style.borderColor='var(--g)';this.style.color='var(--g)'" onmouseout="this.style.borderColor='var(--bdr)';this.style.color='var(--txm)'">Sign in</button>
+    </div>
+
+    <!-- 3 steps -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2rem;max-width:640px;margin-bottom:4rem">
+      <div style="text-align:center">
+        <div style="font-size:28px;margin-bottom:10px">📱</div>
+        <div style="font-size:13px;font-weight:500;color:var(--txt);margin-bottom:4px">Sign up free</div>
+        <div style="font-size:12px;color:var(--txs);line-height:1.5">Get your digital card in seconds</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:28px;margin-bottom:10px">🏪</div>
+        <div style="font-size:13px;font-weight:500;color:var(--txt);margin-bottom:4px">Visit partners</div>
+        <div style="font-size:12px;color:var(--txs);line-height:1.5">Show your QR and collect stamps</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:28px;margin-bottom:10px">🎁</div>
+        <div style="font-size:13px;font-weight:500;color:var(--txt);margin-bottom:4px">Earn rewards</div>
+        <div style="font-size:12px;color:var(--txs);line-height:1.5">Free items waiting for you</div>
+      </div>
+    </div>
+
+    <!-- Restaurant owner link -->
+    <div style="font-size:13px;color:var(--txs)">
+      Are you a restaurant or shop owner?
+      <a onclick="window.location.href='restaurant/index.html'" style="color:var(--g);cursor:pointer;text-decoration:none;font-weight:500;margin-left:4px">Join as a partner →</a>
     </div>
   </div>
-  <div class="stat-row">
-    <div class="stat-card"><div class="stat-num" id="h-cust">—</div><div class="stat-lbl">Active cardholders</div></div>
-    <div class="stat-card"><div class="stat-num">24</div><div class="stat-lbl">Partner restaurants</div></div>
-    <div class="stat-card"><div class="stat-num" id="h-stamps">—</div><div class="stat-lbl">Stamps collected</div></div>
-  </div>
-  <div class="how-grid">
-    <div class="how-card"><div class="how-num">1</div><h3>Sign up free</h3><p>Enter your phone number and create a password. Your card is ready in seconds.</p></div>
-    <div class="how-card"><div class="how-num">2</div><h3>Visit partners</h3><p>Show your QR at any partner restaurant or shop. They scan it and your stamp is saved automatically.</p></div>
-    <div class="how-card"><div class="how-num">3</div><h3>Earn rewards</h3><p>Fill your stamp card and earn a free meal. Collect points for upcoming exclusive rewards.</p></div>
-  </div>
 
-  <!-- Partner restaurants -->
-  <div style="margin-top:1.5rem">
-    <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:500;margin-bottom:4px">Our partners</div>
-    <div style="font-size:13px;color:var(--txs);margin-bottom:1rem">Earn stamps and rewards at all these locations</div>
-    <div id="home-partners" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px">
-      <div class="loading"><span class="spin"></span>Loading partners...</div>
+  <!-- Partner restaurants section -->
+  <div style="padding:3rem 0 2rem">
+    <div style="text-align:center;margin-bottom:1.75rem">
+      <div style="font-family:'Playfair Display',serif;font-size:24px;font-weight:500;color:var(--gd);margin-bottom:6px">Our partners</div>
+      <div style="font-size:13px;color:var(--txs)">Earn stamps and rewards at these locations</div>
+    </div>
+    <div id="home-partners" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px">
+      <div class="loading"><span class="spin"></span>Loading...</div>
     </div>
   </div>
 </div>
@@ -511,7 +541,7 @@ function showPage(id) {
   const navIdx = id === 'login' ? 1 : idx;
   if (navIdx >= 0) document.querySelectorAll('.ntab')[navIdx]?.classList.add('active');
   if (id === 'mycard')      initMyCard();
-  if (id === 'home')        loadHomeStats();
+  if (id === 'home')        loadHomePartners();
   if (id === 'editprofile') initEditProfile();
   if (id === 'rewards')     loadRewards();
   window.scrollTo(0, 0);
@@ -519,11 +549,18 @@ function showPage(id) {
 
 // ── NAV UI based on auth state ──
 function updateNavForAuth(loggedIn) {
-  document.getElementById('nav-signup').style.display  = loggedIn ? 'none'  : 'block';
+  document.getElementById('nav-home').style.display     = loggedIn ? 'none'  : 'block';
+  document.getElementById('nav-signup').style.display   = loggedIn ? 'none'  : 'block';
+  document.getElementById('nav-login-btn').style.display = loggedIn ? 'none' : 'block';
+  document.getElementById('nav-mycard').style.display   = loggedIn ? 'block' : 'none';
   document.getElementById('nav-rewards').style.display  = loggedIn ? 'block' : 'none';
-  document.getElementById('nav-edit').style.display    = loggedIn ? 'block' : 'none';
-  document.getElementById('nav-user').style.display    = loggedIn ? 'flex'  : 'none';
-  document.getElementById('nav-logout').style.display  = loggedIn ? 'block' : 'none';
+  document.getElementById('nav-edit').style.display     = loggedIn ? 'block' : 'none';
+  document.getElementById('nav-user').style.display     = loggedIn ? 'flex'  : 'none';
+  document.getElementById('nav-logout').style.display   = loggedIn ? 'block' : 'none';
+  if (loggedIn && window.curCardData) {
+    document.getElementById('nav-user-name').textContent = window.curCardData.name.split(' ')[0];
+  }
+}
   if (loggedIn && window.curCardData) {
     document.getElementById('nav-user-name').textContent = window.curCardData.name.split(' ')[0];
     // Update home CTA
@@ -1072,7 +1109,6 @@ function renderRewardsList(elId, list, isRedeemed) {
   });
 }
 // ── PARTNER RESTAURANTS ON HOME ──
-async function loadHomePartners() {
   try {
     const { collection, getDocs, query, where } = window.fbFns;
     const snap = await getDocs(query(collection(window.db,'restaurants'), where('disabled','==',false)));
@@ -1097,19 +1133,6 @@ async function loadHomePartners() {
         </div>`;
     });
   } catch(e) { console.error(e); }
-}
-
-async function loadHomeStats() {
-  try {
-    const { collection, getDocs } = window.fbFns;
-    const [c, a] = await Promise.all([
-      getDocs(collection(window.db, 'customers')),
-      getDocs(collection(window.db, 'activity'))
-    ]);
-    document.getElementById('h-cust').textContent   = c.size;
-    document.getElementById('h-stamps').textContent = a.size;
-  } catch(e) {}
-  loadHomePartners();
 }
 
 function showErr(el, msg) {
