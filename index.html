@@ -4,6 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>WafaCard — وفاء كارد</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#064e3b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="WafaCard">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="description" content="Your digital loyalty card for Damascus restaurants and shops">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script type="module">
@@ -58,6 +67,12 @@
   });
 
   window.addEventListener('load', loadHomePartners);
+
+  // Register service worker for PWA
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/Loyalty/sw.js')
+      .catch(err => console.log('SW registration failed:', err));
+  }
 </script>
 <style>
 :root{--gd:#064e3b;--gm:#065f46;--g:#059669;--gl:#d1fae5;--gp:#ecfdf5;--txt:#111827;--txm:#374151;--txs:#6b7280;--bdr:#e5e7eb;--sfc:#f9fafb;--w:#ffffff;--r:14px;--rs:8px;--sh:0 4px 24px rgba(0,0,0,.08);--shl:0 12px 48px rgba(0,0,0,.14)}
@@ -663,8 +678,9 @@ async function doLogin() {
 
 // ── LOGOUT ──
 async function doLogout() {
-  // Stop the real-time listener
   if (cardUnsubscribe) { cardUnsubscribe(); cardUnsubscribe = null; }
+  rewardsCache  = null;
+  partnersCache = null;
   await window.fbFns.signOut(window.auth);
   window.curDocId    = null;
   window.curCardData = null;
@@ -1035,6 +1051,8 @@ function getTier(pts) {
 }
 
 // ── REWARDS ──
+let rewardsCache = null;
+
 async function checkHasUnclaimedRewards() {
   if (!window.curDocId) return false;
   try {
@@ -1045,13 +1063,24 @@ async function checkHasUnclaimedRewards() {
   } catch(e) { return false; }
 }
 
-async function loadRewards() {
+async function loadRewards(forceRefresh = false) {
   if (!window.currentUser || !window.curDocId) {
-    document.getElementById('rewards-loading').style.display  = 'none';
-    document.getElementById('rewards-content').style.display  = 'none';
+    document.getElementById('rewards-loading').style.display   = 'none';
+    document.getElementById('rewards-content').style.display   = 'none';
     document.getElementById('rewards-loggedout').style.display = 'block';
     return;
   }
+
+  // Use cache if available and not forcing refresh
+  if (rewardsCache && !forceRefresh) {
+    document.getElementById('rewards-loading').style.display = 'none';
+    document.getElementById('rewards-content').style.display = 'block';
+    document.getElementById('rewards-loggedout').style.display = 'none';
+    renderRewardsList('rewards-unclaimed', rewardsCache.filter(r => !r.redeemed), false);
+    renderRewardsList('rewards-redeemed',  rewardsCache.filter(r =>  r.redeemed), true);
+    return;
+  }
+
   document.getElementById('rewards-loading').style.display   = 'block';
   document.getElementById('rewards-content').style.display   = 'none';
   document.getElementById('rewards-loggedout').style.display = 'none';
@@ -1061,14 +1090,10 @@ async function loadRewards() {
     const snap = await getDocs(q);
     document.getElementById('rewards-loading').style.display = 'none';
     document.getElementById('rewards-content').style.display = 'block';
-    const unclaimed = [];
-    const redeemed  = [];
-    snap.forEach(d => {
-      const r = { id: d.id, ...d.data() };
-      if (r.redeemed) redeemed.push(r); else unclaimed.push(r);
-    });
-    renderRewardsList('rewards-unclaimed', unclaimed, false);
-    renderRewardsList('rewards-redeemed',  redeemed,  true);
+    rewardsCache = [];
+    snap.forEach(d => rewardsCache.push({ id: d.id, ...d.data() }));
+    renderRewardsList('rewards-unclaimed', rewardsCache.filter(r => !r.redeemed), false);
+    renderRewardsList('rewards-redeemed',  rewardsCache.filter(r =>  r.redeemed), true);
   } catch(e) {
     document.getElementById('rewards-loading').style.display = 'none';
     document.getElementById('rewards-content').style.display = 'block';
@@ -1099,31 +1124,44 @@ function renderRewardsList(elId, list, isRedeemed) {
   });
 }
 // ── PARTNER RESTAURANTS ON HOME ──
+let partnersCache = null;
+
 async function loadHomePartners() {
+  const el = document.getElementById('home-partners');
+  if (!el) return;
+
+  // Use cache if available — instant render
+  if (partnersCache) { renderPartners(partnersCache); return; }
+
   try {
     const { collection, getDocs, query, where } = window.fbFns;
     const snap = await getDocs(query(collection(window.db,'restaurants'), where('disabled','==',false)));
-    const el   = document.getElementById('home-partners');
-    if (!el) return;
-    if (snap.empty) { el.innerHTML = '<div style="font-size:13px;color:var(--txs)">Coming soon — partners joining shortly!</div>'; return; }
-    const catIcons = {
-      restaurant:'🍽', fastfood:'🍔', cafe:'☕', bakery:'🥐',
-      juice:'🥤', icecream:'🍦', shop:'🛍', pharmacy:'💊',
-      gym:'🏋️', salon:'✂️', electronics:'💻', clothing:'👕',
-      bookstore:'📚', other:'🏪'
-    };
-    el.innerHTML = '';
-    snap.forEach(d => {
-      const r    = d.data();
-      const icon = catIcons[r.category] || '🏪';
-      el.innerHTML += `
-        <div style="background:#fff;border:1px solid var(--bdr);border-radius:var(--r);padding:1rem;text-align:center">
-          <div style="font-size:28px;margin-bottom:6px">${icon}</div>
-          <div style="font-size:13px;font-weight:500;color:var(--txt);margin-bottom:3px">${r.name}</div>
-          <div style="font-size:11px;color:var(--txs)">${r.location||'Damascus'}</div>
-        </div>`;
-    });
+    partnersCache = [];
+    snap.forEach(d => partnersCache.push(d.data()));
+    renderPartners(partnersCache);
   } catch(e) { console.error(e); }
+}
+
+function renderPartners(list) {
+  const el = document.getElementById('home-partners');
+  if (!el) return;
+  if (!list.length) { el.innerHTML = '<div style="font-size:13px;color:var(--txs)">Coming soon — partners joining shortly!</div>'; return; }
+  const catIcons = {
+    restaurant:'🍽', fastfood:'🍔', cafe:'☕', bakery:'🥐',
+    juice:'🥤', icecream:'🍦', shop:'🛍', pharmacy:'💊',
+    gym:'🏋️', salon:'✂️', electronics:'💻', clothing:'👕',
+    bookstore:'📚', other:'🏪'
+  };
+  el.innerHTML = '';
+  list.forEach(r => {
+    const icon = catIcons[r.category] || '🏪';
+    el.innerHTML += `
+      <div style="background:#fff;border:1px solid var(--bdr);border-radius:var(--r);padding:1rem;text-align:center">
+        <div style="font-size:28px;margin-bottom:6px">${icon}</div>
+        <div style="font-size:13px;font-weight:500;color:var(--txt);margin-bottom:3px">${r.name}</div>
+        <div style="font-size:11px;color:var(--txs)">${r.location||'Damascus'}</div>
+      </div>`;
+  });
 }
 
 function showErr(el, msg) {
