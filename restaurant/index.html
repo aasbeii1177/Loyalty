@@ -372,12 +372,13 @@ function showPortal() {
   document.getElementById('btn-out').style.display     = 'block';
 }
 async function doLogin() {
-  const username = document.getElementById('li-username').value.trim().toLowerCase();
+  const input    = document.getElementById('li-username').value.trim().toLowerCase();
   const pw       = document.getElementById('li-pw').value;
   const errEl    = document.getElementById('li-err');
   errEl.classList.remove('show');
-  if (!username || !pw) { showErr(errEl,'Enter your username and password'); return; }
-  const email = username + '@wafacard.sy';
+  if (!input || !pw) { showErr(errEl,'Enter your username and password'); return; }
+  // If input contains @ treat as full email, otherwise append @wafacard.sy
+  const email = input.includes('@') ? input : input + '@wafacard.sy';
   const btn   = document.getElementById('btn-login');
   btn.disabled=true; btn.textContent='Signing in...';
   try {
