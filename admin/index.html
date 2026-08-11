@@ -282,7 +282,11 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
       <div class="panel-sub">Create a login account for a restaurant. Give them their email and password once done.</div>
       <div class="form-row cols4" style="margin-bottom:10px">
         <div class="fg fg-inline"><label>Restaurant name</label><input type="text" id="cr-name" placeholder="Shawarma Palace"></div>
-        <div class="fg fg-inline"><label>Login email</label><input type="email" id="cr-email" placeholder="restaurant@example.com"></div>
+        <div class="fg fg-inline">
+          <label>Username — اسم المستخدم</label>
+          <input type="text" id="cr-username" placeholder="shawarmapalace" style="text-transform:lowercase" oninput="this.value=this.value.toLowerCase().replace(/\s+/g,'')">
+          <div class="hint" style="font-size:11px;color:var(--txs);margin-top:3px">Login will be: <span id="cr-username-preview" style="color:var(--g);font-weight:500">shawarmapalace</span></div>
+        </div>
         <div class="fg fg-inline"><label>Password</label><input type="text" id="cr-pw" placeholder="Create a password"></div>
         <button class="btn-action" onclick="createRestaurant()">Create account</button>
       </div>
@@ -328,7 +332,7 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
     </div>
     <div class="table-card">
       <div class="table-top"><div class="table-title">All partner restaurants</div></div>
-      <div class="thead" style="grid-template-columns:2fr 1.5fr 1fr 1fr 1fr 1fr 180px"><div>Restaurant</div><div>Email</div><div>Type</div><div>Location</div><div>Stamps</div><div>Status</div><div>Actions</div></div>
+      <div class="thead" style="grid-template-columns:2fr 1.5fr 1fr 1fr 1fr 1fr 220px"><div>Restaurant</div><div>Username</div><div>Type</div><div>Location</div><div>Stamps</div><div>Status</div><div>Actions</div></div>
       <div id="rest-body"><div class="loading"><span class="spin"></span>Loading...</div></div>
     </div>
 
@@ -712,7 +716,7 @@ async function loadAll() {
 // ── RESTAURANTS ──
 async function createRestaurant() {
   const name      = document.getElementById('cr-name').value.trim();
-  const email     = document.getElementById('cr-email').value.trim();
+  const username  = document.getElementById('cr-username').value.trim().toLowerCase().replace(/\s+/g,'');
   const pw        = document.getElementById('cr-pw').value.trim();
   const category  = document.getElementById('cr-category').value;
   const location  = document.getElementById('cr-location').value.trim();
@@ -721,35 +725,40 @@ async function createRestaurant() {
   const errEl     = document.getElementById('cr-err');
   const sucEl     = document.getElementById('cr-suc');
   errEl.classList.remove('show'); sucEl.classList.remove('show');
-  if (!name || !email || !pw)  { errEl.textContent='Fill name, email and password'; errEl.classList.add('show'); return; }
-  if (!category)               { errEl.textContent='Select a category type'; errEl.classList.add('show'); return; }
-  if (pw.length < 6)           { errEl.textContent='Password must be 6+ characters'; errEl.classList.add('show'); return; }
-  const btn = document.querySelector('#tab-restaurants .btn-action');
+  if (!name || !username || !pw) { errEl.textContent='Fill name, username and password'; errEl.classList.add('show'); return; }
+  if (!category)                 { errEl.textContent='Select a category type'; errEl.classList.add('show'); return; }
+  if (pw.length < 6)             { errEl.textContent='Password must be 6+ characters'; errEl.classList.add('show'); return; }
+  if (!/^[a-z0-9_]+$/.test(username)) { errEl.textContent='Username can only contain letters, numbers and underscores'; errEl.classList.add('show'); return; }
+
+  const email = username + '@wafacard.sy';
+  const btn   = document.querySelector('#tab-restaurants .btn-action');
   btn.disabled = true; btn.textContent = 'Creating...';
   try {
     const { createUserWithEmailAndPassword, collection, addDoc, serverTimestamp } = window.fbFns;
     const cred = await createUserWithEmailAndPassword(window.auth, email, pw);
     await addDoc(collection(window.db,'restaurants'), {
-      uid: cred.user.uid, name, email,
+      uid: cred.user.uid, name,
+      username, email,
       category, location: location || null,
       stampThreshold: threshold,
       rewardDescription: reward || 'Free item',
       disabled: false, createdAt: serverTimestamp()
     });
-    sucEl.textContent = `✓ Created "${name}" — ${threshold} stamps for a reward — Email: ${email} · Password: ${pw}`;
+    sucEl.textContent = `✓ Created "${name}" — Username: ${username} · Password: ${pw}`;
     sucEl.classList.add('show');
     document.getElementById('cr-name').value      = '';
-    document.getElementById('cr-email').value     = '';
+    document.getElementById('cr-username').value  = '';
     document.getElementById('cr-pw').value        = '';
     document.getElementById('cr-category').value  = '';
     document.getElementById('cr-location').value  = '';
     document.getElementById('cr-threshold').value = '9';
     document.getElementById('cr-reward').value    = '';
+    document.getElementById('cr-username-preview').textContent = 'username';
     toast('✓ Restaurant account created');
     loadAll();
   } catch(e) {
     let msg = e.message;
-    if (e.code === 'auth/email-already-in-use') msg = 'This email already has an account.';
+    if (e.code === 'auth/email-already-in-use') msg = 'This username is already taken.';
     errEl.textContent = msg; errEl.classList.add('show');
   } finally { btn.disabled=false; btn.textContent='Create account'; }
 }
@@ -807,7 +816,7 @@ function renderRestaurants(list) {
     const catLabel = getCategoryLabel(r.category);
     el.innerHTML += `<div class="trow" style="grid-template-columns:2fr 1.5fr 1fr 1fr 1fr 1fr 220px">
       <div class="tname">${r.name}</div>
-      <div style="color:var(--txs);font-size:12px">${r.email}</div>
+      <div style="color:var(--txs);font-size:12px;font-weight:500">${r.username || r.email}</div>
       <div style="font-size:12px">${catLabel}</div>
       <div style="color:var(--txs);font-size:12px">${r.location||'—'}</div>
       <div style="font-size:12px;font-weight:500">${r.stampThreshold||9} stamps</div>
@@ -1239,6 +1248,11 @@ function filterCustomers(val) {
 }
 
 // ── HELPERS ──
+// Username preview
+document.getElementById('cr-username')?.addEventListener('input', function() {
+  document.getElementById('cr-username-preview').textContent = this.value || 'username';
+});
+
 function getCategoryLabel(cat) {
   const map = {
     restaurant: '🍽 Restaurant', fastfood: '🍔 Fast food',
