@@ -561,16 +561,6 @@ function updateNavForAuth(loggedIn) {
     document.getElementById('nav-user-name').textContent = window.curCardData.name.split(' ')[0];
   }
 }
-  if (loggedIn && window.curCardData) {
-    document.getElementById('nav-user-name').textContent = window.curCardData.name.split(' ')[0];
-    // Update home CTA
-    document.getElementById('home-cta').textContent = 'View my card →';
-    document.getElementById('home-cta').onclick = () => showPage('mycard');
-  } else {
-    document.getElementById('home-cta').textContent = 'Get your free card →';
-    document.getElementById('home-cta').onclick = () => showPage('signup');
-  }
-}
 
 // ── LIVE PREVIEW ──
 function upPrev() {
