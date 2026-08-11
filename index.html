@@ -186,7 +186,60 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
 .switch-btn{width:100%;background:none;border:1px solid var(--bdr);border-radius:var(--rs);padding:10px;font-size:13px;color:var(--txs);cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:4px;transition:all .18s}
 .switch-btn:hover{border-color:var(--g);color:var(--g)}
 
-/* UTILS */
+/* ── MOBILE RESPONSIVE ── */
+@media (max-width: 640px) {
+  /* Nav — horizontal scroll on mobile */
+  nav { padding: 0 1rem; height: 56px; }
+  .ntabs { gap: 2px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .ntabs::-webkit-scrollbar { display: none; }
+  .ntab { padding: 6px 10px; font-size: 12px; white-space: nowrap; flex-shrink: 0; }
+  .nav-user { padding: 4px 10px; font-size: 12px; }
+  .btn-logout { padding: 5px 10px; font-size: 11px; }
+
+  /* Pages */
+  .page { padding: 1rem; }
+
+  /* Home hero */
+  .hero { padding: 2rem 1.25rem; }
+  .hero-title { font-size: 28px; }
+  .hero-sub { font-size: 14px; }
+  .stat-row { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .how-grid { grid-template-columns: 1fr; gap: 8px; }
+
+  /* Auth */
+  .auth-wrap { flex-direction: column; align-items: center; }
+  .prev-card { display: none; }
+  .auth-box { padding: 1.5rem; }
+
+  /* My Card — stack card and panels */
+  .card-grid { grid-template-columns: 1fr; gap: 1rem; }
+  .digital-card { padding: 1.5rem; }
+  .dcn { font-size: 22px; }
+  .dcqr { margin-bottom: 1.25rem; }
+
+  /* Stamp circles — slightly smaller on mobile */
+  .stc { width: 32px; height: 32px; font-size: 12px; }
+
+  /* Panels */
+  .panel { padding: 1rem; }
+
+  /* Edit profile */
+  .auth-box { max-width: 100%; }
+
+  /* Rewards page */
+  .ptitle { font-size: 22px; }
+
+  /* Toast — full width on mobile */
+  .toast { width: calc(100% - 2rem); text-align: center; white-space: normal; }
+
+  /* Category and sort tabs — scroll on mobile */
+  #cat-tabs, #sort-tabs { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding-bottom: 2px; }
+  #cat-tabs::-webkit-scrollbar, #sort-tabs::-webkit-scrollbar { display: none; }
+  .cat-tab, .sort-tab { flex-shrink: 0; }
+
+  /* Home partners grid */
+  #home-partners { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+}
 .ptitle{font-family:'Playfair Display',serif;font-size:26px;font-weight:500;margin-bottom:4px}
 .psub{font-size:14px;color:var(--txs);margin-bottom:1.5rem}
 .loading{text-align:center;padding:1.5rem;color:var(--txs);font-size:13px}
@@ -267,7 +320,7 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
     </div>
 
     <!-- 3 steps -->
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2rem;max-width:640px;margin-bottom:4rem">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1.5rem;max-width:640px;margin-bottom:3rem;width:100%">
       <div style="text-align:center">
         <div style="font-size:28px;margin-bottom:10px">📱</div>
         <div style="font-size:13px;font-weight:500;color:var(--txt);margin-bottom:4px">Sign up free</div>
