@@ -216,8 +216,11 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
   <div class="login-box">
     <div class="login-icon">🥙</div>
     <div class="login-title">Restaurant Login</div>
-    <div class="login-sub">Sign in with the credentials provided by WafaCard to access your partner portal.</div>
-    <div class="fg"><label>Email address</label><input type="email" id="li-email" placeholder="your@restaurant.com"></div>
+    <div class="login-sub">Sign in with the username and password provided by WafaCard.</div>
+    <div class="fg">
+      <label>Username — اسم المستخدم</label>
+      <input type="text" id="li-username" placeholder="shawarmapalace" style="text-transform:lowercase" oninput="this.value=this.value.toLowerCase().replace(/\s+/g,'')">
+    </div>
     <div class="fg"><label>Password</label><input type="password" id="li-pw" placeholder="••••••••"></div>
     <div class="err-msg" id="li-err">—</div>
     <button class="btn-main" id="btn-login" onclick="doLogin()">Sign in</button>
@@ -369,17 +372,18 @@ function showPortal() {
   document.getElementById('btn-out').style.display     = 'block';
 }
 async function doLogin() {
-  const email = document.getElementById('li-email').value.trim();
-  const pw    = document.getElementById('li-pw').value;
-  const errEl = document.getElementById('li-err');
+  const username = document.getElementById('li-username').value.trim().toLowerCase();
+  const pw       = document.getElementById('li-pw').value;
+  const errEl    = document.getElementById('li-err');
   errEl.classList.remove('show');
-  if (!email || !pw) { showErr(errEl,'Enter email and password'); return; }
-  const btn = document.getElementById('btn-login');
+  if (!username || !pw) { showErr(errEl,'Enter your username and password'); return; }
+  const email = username + '@wafacard.sy';
+  const btn   = document.getElementById('btn-login');
   btn.disabled=true; btn.textContent='Signing in...';
   try {
     await window.fbFns.signInWithEmailAndPassword(window.auth, email, pw);
   } catch(e) {
-    let msg = 'Incorrect email or password.';
+    let msg = 'Incorrect username or password.';
     if (e.code==='auth/user-not-found')    msg='No account found. Contact WafaCard.';
     if (e.code==='auth/wrong-password')    msg='Incorrect password.';
     if (e.code==='auth/too-many-requests') msg='Too many attempts. Try again later.';
