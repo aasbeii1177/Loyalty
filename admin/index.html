@@ -514,6 +514,47 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
 </div>
 
 <!-- CONFIRM MODAL -->
+<!-- EDIT RESTAURANT MODAL -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal" style="max-width:520px;width:90%">
+    <div class="modal-title">✏️ Edit restaurant</div>
+    <div style="margin-bottom:1.25rem">
+      <input type="hidden" id="edit-doc-id">
+      <div class="fg" style="margin-bottom:.75rem"><label>Restaurant name</label><input type="text" id="edit-name" placeholder="Shawarma Palace"></div>
+      <div class="fg" style="margin-bottom:.75rem">
+        <label>Type / Category</label>
+        <select id="edit-category">
+          <option value="">Select type</option>
+          <option value="restaurant">🍽 Restaurant</option>
+          <option value="fastfood">🍔 Fast food</option>
+          <option value="cafe">☕ Cafe</option>
+          <option value="bakery">🥐 Bakery & pastry</option>
+          <option value="juice">🥤 Juice & smoothies</option>
+          <option value="icecream">🍦 Ice cream & desserts</option>
+          <option value="shop">🛍 Shop</option>
+          <option value="pharmacy">💊 Pharmacy</option>
+          <option value="gym">🏋️ Gym & sports</option>
+          <option value="salon">✂️ Salon & barber</option>
+          <option value="electronics">💻 Electronics</option>
+          <option value="clothing">👕 Clothing</option>
+          <option value="bookstore">📚 Books & stationery</option>
+          <option value="other">🏪 Other</option>
+        </select>
+      </div>
+      <div class="fg" style="margin-bottom:.75rem"><label>Location / Branch</label><input type="text" id="edit-location" placeholder="e.g. Mazzeh · Old City"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="fg" style="margin-bottom:0"><label>Stamps for free reward</label><input type="number" id="edit-threshold" min="3" max="20"></div>
+        <div class="fg" style="margin-bottom:0"><label>Free reward description</label><input type="text" id="edit-reward" placeholder="Free shawarma"></div>
+      </div>
+      <div class="err-msg" id="edit-err" style="margin-top:8px">—</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeEditModal()">Cancel</button>
+      <button style="background:var(--gd);color:#fff;border:none;border-radius:var(--rs);padding:9px 18px;font-size:14px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif" id="btn-save-edit" onclick="saveRestaurantEdit()">Save changes</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal">
   <div class="modal">
     <div class="modal-icon">⚠️</div>
@@ -758,24 +799,85 @@ function renderRestaurants(list) {
   if (!list.length) { el.innerHTML='<div class="empty">No restaurants yet</div>'; return; }
   el.innerHTML = '';
   list.forEach(r => {
-    const joined   = r.createdAt ? new Date(r.createdAt.seconds*1000).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '—';
     const disabled = r.disabled === true;
     const badge    = disabled ? '<span class="badge badge-disabled">⏸ Disabled</span>' : '<span class="badge badge-active">● Active</span>';
     const toggleBtn = disabled
       ? `<button class="btn-sm btn-enable" onclick="toggleRestaurant('${r.id}',true,'${r.name}')">Enable</button>`
       : `<button class="btn-sm btn-disable" onclick="toggleRestaurant('${r.id}',false,'${r.name}')">Disable</button>`;
     const catLabel = getCategoryLabel(r.category);
-    el.innerHTML += `<div class="trow" style="grid-template-columns:2fr 1.5fr 1fr 1fr 1fr 1fr 180px">
+    el.innerHTML += `<div class="trow" style="grid-template-columns:2fr 1.5fr 1fr 1fr 1fr 1fr 220px">
       <div class="tname">${r.name}</div>
       <div style="color:var(--txs);font-size:12px">${r.email}</div>
       <div style="font-size:12px">${catLabel}</div>
       <div style="color:var(--txs);font-size:12px">${r.location||'—'}</div>
       <div style="font-size:12px;font-weight:500">${r.stampThreshold||9} stamps</div>
       <div>${badge}</div>
-      <div class="action-btns">${toggleBtn}<button class="btn-sm btn-delete" onclick="confirmDeleteRestaurant('${r.id}','${r.name}')">Delete</button></div>
+      <div class="action-btns">
+        <button class="btn-sm btn-activate" onclick="openEditModal('${r.id}')">✏️ Edit</button>
+        ${toggleBtn}
+        <button class="btn-sm btn-delete" onclick="confirmDeleteRestaurant('${r.id}','${r.name}')">Delete</button>
+      </div>
     </div>`;
   });
 }
+
+// ── EDIT RESTAURANT ──
+function openEditModal(docId) {
+  const r = allRestaurants.find(r => r.id === docId);
+  if (!r) return;
+  document.getElementById('edit-doc-id').value        = docId;
+  document.getElementById('edit-name').value          = r.name || '';
+  document.getElementById('edit-category').value      = r.category || '';
+  document.getElementById('edit-location').value      = r.location || '';
+  document.getElementById('edit-threshold').value     = r.stampThreshold || 9;
+  document.getElementById('edit-reward').value        = r.rewardDescription || '';
+  document.getElementById('edit-err').classList.remove('show');
+  document.getElementById('edit-modal').classList.add('show');
+}
+
+function closeEditModal() {
+  document.getElementById('edit-modal').classList.remove('show');
+}
+
+async function saveRestaurantEdit() {
+  const docId     = document.getElementById('edit-doc-id').value;
+  const name      = document.getElementById('edit-name').value.trim();
+  const category  = document.getElementById('edit-category').value;
+  const location  = document.getElementById('edit-location').value.trim();
+  const threshold = parseInt(document.getElementById('edit-threshold').value) || 9;
+  const reward    = document.getElementById('edit-reward').value.trim();
+  const errEl     = document.getElementById('edit-err');
+  errEl.classList.remove('show');
+
+  if (!name)     { errEl.textContent = 'Name cannot be empty'; errEl.classList.add('show'); return; }
+  if (!category) { errEl.textContent = 'Please select a category'; errEl.classList.add('show'); return; }
+
+  const btn = document.getElementById('btn-save-edit');
+  btn.disabled = true; btn.textContent = 'Saving...';
+  try {
+    const { doc, updateDoc } = window.fbFns;
+    await updateDoc(doc(window.db, 'restaurants', docId), {
+      name,
+      category,
+      location:          location || null,
+      stampThreshold:    threshold,
+      rewardDescription: reward || 'Free item'
+    });
+    closeEditModal();
+    toast('✓ Restaurant updated');
+    loadAll();
+  } catch(e) {
+    errEl.textContent = 'Error: ' + e.message;
+    errEl.classList.add('show');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save changes';
+  }
+}
+
+// Close edit modal on overlay click
+document.getElementById('edit-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeEditModal();
+});
 
 async function toggleRestaurant(docId, currentlyDisabled, name) {
   try {
