@@ -80,19 +80,35 @@
 body{font-family:'DM Sans',sans-serif;background:#f3f4f6;color:var(--txt);min-height:100vh}
 
 /* NAV */
-nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-content:space-between;height:64px;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,.2)}
-.logo{display:flex;align-items:center;gap:10px;cursor:pointer}
+nav{background:var(--gd);padding:0 1.5rem;display:flex;align-items:center;justify-content:space-between;height:60px;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,.15)}
+.logo{display:flex;align-items:center;gap:10px;cursor:pointer;flex-shrink:0}
 .logo-mark{width:34px;height:34px;background:var(--g);border-radius:9px;display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:17px;color:#fff;font-weight:600}
 .logo-text{font-family:'Playfair Display',serif;font-size:19px;color:#fff;letter-spacing:-.3px}
 .logo-text span{color:#6ee7b7}
 .ntabs{display:flex;gap:4px;align-items:center}
-.ntab{padding:7px 16px;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;border:none;background:transparent;color:rgba(255,255,255,.6);transition:all .18s;font-family:'DM Sans',sans-serif}
+.ntab{padding:7px 14px;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;border:none;background:transparent;color:rgba(255,255,255,.7);transition:all .18s;font-family:'DM Sans',sans-serif;white-space:nowrap}
 .ntab:hover{color:#fff;background:rgba(255,255,255,.08)}
-.ntab.active{background:var(--g);color:#fff}
-.nav-user{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);border-radius:20px;padding:5px 14px;font-size:13px;color:#fff}
-.nav-user-dot{width:7px;height:7px;border-radius:50%;background:#6ee7b7}
-.btn-logout{background:none;border:1px solid rgba(255,255,255,.25);border-radius:var(--rs);padding:6px 12px;font-size:12px;color:rgba(255,255,255,.7);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .18s}
-.btn-logout:hover{background:rgba(255,255,255,.1);color:#fff}
+.ntab.active{background:rgba(255,255,255,.12);color:#fff}
+.ntab-cta{background:var(--g) !important;color:#fff !important;border-radius:20px;padding:7px 18px}
+.ntab-cta:hover{background:#047857 !important}
+/* HAMBURGER */
+.hamburger{background:none;border:none;cursor:pointer;padding:8px 6px;display:flex;flex-direction:column;gap:5px;border-radius:var(--rs);transition:background .18s;margin-left:4px}
+.hamburger:hover{background:rgba(255,255,255,.1)}
+.hamburger span{display:block;width:20px;height:2px;background:rgba(255,255,255,.85);border-radius:2px;transition:all .25s}
+.hamburger.open span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+.hamburger.open span:nth-child(2){opacity:0;transform:scaleX(0)}
+.hamburger.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+/* DROPDOWN */
+.ham-dropdown{display:none;position:absolute;right:0;top:calc(100% + 10px);background:#fff;border:1px solid var(--bdr);border-radius:var(--r);box-shadow:var(--shl);min-width:200px;overflow:hidden;animation:fu .2s ease}
+.ham-dropdown.open{display:block}
+.ham-user{display:flex;align-items:center;gap:8px;padding:12px 16px;background:var(--gp)}
+.nav-user-dot{width:8px;height:8px;border-radius:50%;background:var(--g);flex-shrink:0}
+#nav-user-name{font-size:13px;font-weight:500;color:var(--gd)}
+.ham-divider{height:1px;background:var(--bdr)}
+.ham-item{width:100%;background:none;border:none;padding:12px 16px;font-size:14px;font-family:'DM Sans',sans-serif;color:var(--txt);cursor:pointer;text-align:left;transition:background .15s;display:block}
+.ham-item:hover{background:var(--sfc)}
+.ham-signout{color:#dc2626}
+.ham-signout:hover{background:#fef2f2}
 
 /* PAGES */
 .page{display:none;padding:2rem;max-width:920px;margin:0 auto}
@@ -186,58 +202,24 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
 .switch-btn{width:100%;background:none;border:1px solid var(--bdr);border-radius:var(--rs);padding:10px;font-size:13px;color:var(--txs);cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:4px;transition:all .18s}
 .switch-btn:hover{border-color:var(--g);color:var(--g)}
 
-/* ── MOBILE RESPONSIVE ── */
 @media (max-width: 640px) {
-  /* Nav — horizontal scroll on mobile */
   nav { padding: 0 1rem; height: 56px; }
-  .ntabs { gap: 2px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
-  .ntabs::-webkit-scrollbar { display: none; }
-  .ntab { padding: 6px 10px; font-size: 12px; white-space: nowrap; flex-shrink: 0; }
-  .nav-user { padding: 4px 10px; font-size: 12px; }
-  .btn-logout { padding: 5px 10px; font-size: 11px; }
-
-  /* Pages */
+  .ntab { padding: 6px 10px; font-size: 13px; }
+  .logo-text { font-size: 17px; }
   .page { padding: 1rem; }
-
-  /* Home hero */
-  .hero { padding: 2rem 1.25rem; }
-  .hero-title { font-size: 28px; }
-  .hero-sub { font-size: 14px; }
-  .stat-row { grid-template-columns: 1fr 1fr; gap: 8px; }
-  .how-grid { grid-template-columns: 1fr; gap: 8px; }
-
-  /* Auth */
-  .auth-wrap { flex-direction: column; align-items: center; }
-  .prev-card { display: none; }
-  .auth-box { padding: 1.5rem; }
-
-  /* My Card — stack card and panels */
   .card-grid { grid-template-columns: 1fr; gap: 1rem; }
   .digital-card { padding: 1.5rem; }
   .dcn { font-size: 22px; }
-  .dcqr { margin-bottom: 1.25rem; }
-
-  /* Stamp circles — slightly smaller on mobile */
   .stc { width: 32px; height: 32px; font-size: 12px; }
-
-  /* Panels */
   .panel { padding: 1rem; }
-
-  /* Edit profile */
-  .auth-box { max-width: 100%; }
-
-  /* Rewards page */
+  .auth-wrap { flex-direction: column; align-items: center; }
+  .prev-card { display: none; }
+  .auth-box { padding: 1.5rem; max-width: 100%; }
   .ptitle { font-size: 22px; }
-
-  /* Toast — full width on mobile */
   .toast { width: calc(100% - 2rem); text-align: center; white-space: normal; }
-
-  /* Category and sort tabs — scroll on mobile */
   #cat-tabs, #sort-tabs { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding-bottom: 2px; }
   #cat-tabs::-webkit-scrollbar, #sort-tabs::-webkit-scrollbar { display: none; }
   .cat-tab, .sort-tab { flex-shrink: 0; }
-
-  /* Home partners grid */
   #home-partners { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
 }
 .ptitle{font-family:'Playfair Display',serif;font-size:26px;font-weight:500;margin-bottom:4px}
@@ -277,18 +259,34 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
     <div class="logo-mark">و</div>
     <div class="logo-text">Wafa<span>Card</span></div>
   </div>
-  <div class="ntabs">
+
+  <!-- Logged out nav -->
+  <div class="ntabs" id="nav-loggedout">
     <button class="ntab active" onclick="showPage('home')" id="nav-home">Home</button>
-    <button class="ntab" onclick="showPage('signup')" id="nav-signup">Sign Up</button>
-    <button class="ntab" onclick="showPage('login')" id="nav-login-btn">Sign In</button>
-    <button class="ntab" onclick="showPage('mycard')" id="nav-mycard" style="display:none">My Card</button>
-    <button class="ntab" onclick="showPage('rewards')" id="nav-rewards" style="display:none">🎁 Rewards</button>
-    <button class="ntab" onclick="showPage('editprofile')" id="nav-edit" style="display:none">Edit Profile</button>
-    <div class="nav-user" id="nav-user" style="display:none">
-      <div class="nav-user-dot"></div>
-      <span id="nav-user-name">—</span>
+    <button class="ntab" onclick="showPage('signup')" id="nav-signup">Sign up</button>
+    <button class="ntab ntab-cta" onclick="showPage('login')" id="nav-login-btn">Sign in</button>
+  </div>
+
+  <!-- Logged in nav -->
+  <div class="ntabs" id="nav-loggedin" style="display:none">
+    <button class="ntab" onclick="showPage('mycard')" id="nav-mycard">My Card</button>
+    <button class="ntab" onclick="showPage('rewards')" id="nav-rewards">🎁 Rewards</button>
+    <!-- Hamburger -->
+    <div style="position:relative">
+      <button class="hamburger" id="hamburger-btn" onclick="toggleMenu()" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+      <!-- Dropdown -->
+      <div class="ham-dropdown" id="ham-dropdown">
+        <div class="ham-user" id="nav-user">
+          <div class="nav-user-dot"></div>
+          <span id="nav-user-name">—</span>
+        </div>
+        <div class="ham-divider"></div>
+        <button class="ham-item" onclick="showPage('editprofile');closeMenu()">✏️ Edit profile</button>
+        <button class="ham-item ham-signout" onclick="doLogout();closeMenu()">↩ Sign out</button>
+      </div>
     </div>
-    <button class="btn-logout" id="nav-logout" onclick="doLogout()" style="display:none">Sign out</button>
   </div>
 </nav>
 
@@ -599,6 +597,26 @@ nav{background:var(--gd);padding:0 2rem;display:flex;align-items:center;justify-
 <div class="toast" id="toast"></div>
 
 <script>
+// ── HAMBURGER MENU ──
+function toggleMenu() {
+  const btn      = document.getElementById('hamburger-btn');
+  const dropdown = document.getElementById('ham-dropdown');
+  btn.classList.toggle('open');
+  dropdown.classList.toggle('open');
+}
+function closeMenu() {
+  document.getElementById('hamburger-btn').classList.remove('open');
+  document.getElementById('ham-dropdown').classList.remove('open');
+}
+// Close when clicking outside
+document.addEventListener('click', function(e) {
+  const btn      = document.getElementById('hamburger-btn');
+  const dropdown = document.getElementById('ham-dropdown');
+  if (btn && dropdown && !btn.contains(e.target) && !dropdown.contains(e.target)) {
+    closeMenu();
+  }
+});
+
 // ── NAVIGATION ──
 function showPage(id) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -617,14 +635,8 @@ function showPage(id) {
 
 // ── NAV UI based on auth state ──
 function updateNavForAuth(loggedIn) {
-  document.getElementById('nav-home').style.display     = loggedIn ? 'none'  : 'block';
-  document.getElementById('nav-signup').style.display   = loggedIn ? 'none'  : 'block';
-  document.getElementById('nav-login-btn').style.display = loggedIn ? 'none' : 'block';
-  document.getElementById('nav-mycard').style.display   = loggedIn ? 'block' : 'none';
-  document.getElementById('nav-rewards').style.display  = loggedIn ? 'block' : 'none';
-  document.getElementById('nav-edit').style.display     = loggedIn ? 'block' : 'none';
-  document.getElementById('nav-user').style.display     = loggedIn ? 'flex'  : 'none';
-  document.getElementById('nav-logout').style.display   = loggedIn ? 'block' : 'none';
+  document.getElementById('nav-loggedout').style.display = loggedIn ? 'none' : 'flex';
+  document.getElementById('nav-loggedin').style.display  = loggedIn ? 'flex' : 'none';
   if (loggedIn && window.curCardData) {
     document.getElementById('nav-user-name').textContent = window.curCardData.name.split(' ')[0];
   }
